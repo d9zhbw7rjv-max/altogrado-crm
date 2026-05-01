@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
 const CONFIG = {
-  SHEET_ID: import.meta.env.VITE_SHEET_ID || "YOUR_GOOGLE_SHEET_ID",
-  API_KEY: import.meta.env.VITE_API_KEY || "YOUR_GOOGLE_SHEETS_API_KEY",
-  MAKE_WEBHOOK_E5: "https://hook.us2.make.com/jyfj767nmqfnpj7uk8srlyvudficta7x",
+  SHEET_ID: "YOUR_GOOGLE_SHEET_ID",
+  API_KEY: "YOUR_GOOGLE_SHEETS_API_KEY",
+  MAKE_WEBHOOK_E5: "https://hook.eu1.make.com/YOUR_ESCENARIO5_URL",
   MAKE_WEBHOOK_RESULT: "https://hook.eu1.make.com/YOUR_RESULTADO_URL",
   CURRENT_USER: { id: "VEND-001", name: "Areli Rios", email: "areli@altogradolabdental.com" },
 };
@@ -14,7 +14,6 @@ const ZONAS_LIST = ['ANZURES','AZCAPOTZALCO','BENITO JUAREZ','CENTRO','CLAVERIA'
   'NAPOLES','NARVARTE','NAUCALPAN','PEDREGAL','POLANCO','POPOTLA',
   'SAN MIGUEL CHAPULTEPEC','SAN RAFAEL','SANTA FE','SATELITE','TLALPAN',
   'TLANEPANTLA','TLATELOLCO','VILLA COAPA'];
-
 
 const ESTADO_CONFIG = {
   NUEVO:{color:"#94A3B8",bg:"#F8FAFC",label:"Nuevo"},
@@ -346,9 +345,18 @@ function ProspectoModal({p,onClose,onUpdate,onToast,plan,addNotif}){
 
       {showCall&&<CallModal prospecto={p} plan={INIT_PLAN[W0]} onClose={()=>setShowCall(false)}
         onCallDirect={()=>window.open(`tel:${p.telefono}`,"_self")}
-        onCallSystem={(mode,enZona)=>{
+        onCallSystem={async(mode,enZona)=>{
           onToast(enZona?"🤖 Ana ofrece visita inmediata...":"🤖 Ana está llamando...","info");
-          addNotif({id:Date.now(),icon:"🤖",title:"Ana llamó a "+p.nombre,body:enZona?"Ana ofreció que puedes pasar hoy mismo.":"Ana intentará agendar cita.",time:"Ahora mismo",read:false});
+          try {
+            await fetch(CONFIG.MAKE_WEBHOOK_E5,{
+              method:"POST",
+              headers:{"Content-Type":"application/json"},
+              body:JSON.stringify({zona:p.zona,id_vendedor:CONFIG.CURRENT_USER.id,max_llamadas:1,vendedora_en_zona:enZona})
+            });
+            addNotif({id:Date.now(),icon:"🤖",title:"Ana llamó a "+p.nombre,body:enZona?"Ana ofreció que puedes pasar hoy mismo.":"Ana intentará agendar cita.",time:"Ahora mismo",read:false});
+          } catch(e){
+            onToast("⚠️ Error de conexión","error");
+          }
         }}/>}
     </>
   );
@@ -413,7 +421,24 @@ function MapaDelDia({prospectos,onSelect,onToast,addNotif}){
           {zonas.map(zona=>{
             const count=prospectos.filter(p=>p.zona===zona&&["NUEVO","LLAMADA_PENDIENTE"].includes(p.estado)).length;
             return(
-              <button key={zona} onClick={()=>{onToast(`🤖 Ana llamando en ${zona}...`,"info");addNotif({id:Date.now(),icon:"🤖",title:`Llamadas en ${zona}`,body:"Te avisamos cuando haya citas agendadas.",time:"Ahora mismo",read:false});}} style={{padding:"10px 12px",background:"white",border:"1.5px solid #E2E8F0",borderRadius:12,cursor:"pointer",textAlign:"left",boxShadow:"0 1px 4px rgba(0,0,0,0.04)"}}>
+              <button key={zona} onClick={async()=>{
+  onToast(`🤖 Enviando llamadas en ${zona}...`,"info");
+  try {
+    const res = await fetch(CONFIG.MAKE_WEBHOOK_E5, {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({zona, id_vendedor:CONFIG.CURRENT_USER.id, max_llamadas:3})
+    });
+    if(res.ok){
+      onToast(`✅ Ana llamando en ${zona}`,"success");
+      addNotif({id:Date.now(),icon:"🤖",title:`Llamadas iniciadas en ${zona}`,body:"Ana está contactando prospectos. Te avisamos cuando haya citas.",time:"Ahora mismo",read:false});
+    } else {
+      onToast("⚠️ Error al contactar Make","error");
+    }
+  } catch(e) {
+    onToast("⚠️ Error de conexión","error");
+  }
+}} style={{padding:"10px 12px",background:"white",border:"1.5px solid #E2E8F0",borderRadius:12,cursor:"pointer",textAlign:"left",boxShadow:"0 1px 4px rgba(0,0,0,0.04)"}}>
                 <div style={{fontSize:12,fontWeight:700,color:"#0F172A"}}>{zona}</div>
                 <div style={{fontSize:11,color:"#64748B",marginTop:2}}>{count} disponibles</div>
                 <div style={{fontSize:10,color:"#8B5CF6",marginTop:4,fontWeight:600}}>🤖 Que Ana llame →</div>
@@ -745,7 +770,12 @@ function NuevaClinica({onToast,addNotif,prospectos}){
                   <div style={{fontSize:13,fontWeight:600}}>{p.nombre}</div>
                   <ScoreBadge score={p.score}/>
                 </div>
-                <button onClick={()=>addNotif({id:Date.now(),icon:"🤖",title:"Ana llamó a "+p.nombre,body:"Te notificamos cuando termine.",time:"Ahora mismo",read:false})} style={{padding:"6px 12px",background:"#8B5CF6",color:"white",border:"none",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer"}}>
+                <button onClick={async()=>{
+  try {
+    await fetch(CONFIG.MAKE_WEBHOOK_E5,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({zona:p.zona,id_vendedor:CONFIG.CURRENT_USER.id,max_llamadas:1})});
+    addNotif({id:Date.now(),icon:"🤖",title:"Ana llamó a "+p.nombre,body:"Te notificamos cuando termine.",time:"Ahora mismo",read:false});
+  } catch(e){}
+}} style={{padding:"6px 12px",background:"#8B5CF6",color:"white",border:"none",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer"}}>
                   Ana llama
                 </button>
               </div>
