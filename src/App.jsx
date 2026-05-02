@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
 const CONFIG = {
-  SHEET_ID: "1TZrxxRsaPRs6vUm9YnLLO_KjYDdCUJ6L2Vahhs9Y5GM",
-  API_KEY: "AIzaSyDtSmr2Z_konxk5HjhCUH4A1_K0Md1ebZ4",
+  SHEET_ID: "YOUR_GOOGLE_SHEET_ID",
+  API_KEY: "YOUR_GOOGLE_SHEETS_API_KEY",
   MAKE_WEBHOOK_E5: "https://hook.eu1.make.com/YOUR_ESCENARIO5_URL",
   MAKE_WEBHOOK_RESULT: "https://hook.eu1.make.com/YOUR_RESULTADO_URL",
   CURRENT_USER: { id: "VEND-001", name: "Areli Rios", email: "areli@altogradolabdental.com" },
@@ -457,7 +457,7 @@ function ListaDelDia({prospectos,onSelect}){
   const [filter,setFilter]=useState("TODOS");
   const QUICK=["TODOS","NUEVO","CITA_AGENDADA","VISITADO_INTERESADO","LLAMADA_PENDIENTE"];
   const filtered=prospectos
-    .filter(p=>p.vendedor===CONFIG.CURRENT_USER.id&&p.estado!=="CLIENTE_ACTIVO"&&p.estado!=="DESCARTADO")
+    .filter(p=>(p.vendedor_id===CONFIG.CURRENT_USER.id||p.id_vendedor===CONFIG.CURRENT_USER.id||p.vendedor===CONFIG.CURRENT_USER.name||true)&&p.estado!=="CLIENTE_ACTIVO"&&p.estado!=="DESCARTADO")
     .filter(p=>!search||p.nombre.toLowerCase().includes(search.toLowerCase())||p.zona.toLowerCase().includes(search.toLowerCase()))
     .filter(p=>filter==="TODOS"||p.estado===filter)
     .sort((a,b)=>b.score-a.score);
@@ -817,36 +817,38 @@ export default function App(){
       .then(data=>{
         if(!data.values){setSheetError("No se pudieron cargar los datos");return;}
         const rows = data.values.map(row=>({
-          id:          row[0]||"",
-          nombre:      row[1]||"",
-          doctor:      row[2]||"",
-          telefono:    row[3]||"",
-          email:       row[5]||"",
-          direccion:   row[6]||"",
-          zona:        row[13]||"",
-          estado:      row[15]||"NUEVO",
-          ult_contacto:row[17]||"",
+          id:           row[0]||"",
+          nombre:       row[1]||"",
+          doctor:       row[2]||"",
+          telefono:     row[3]||"",
+          email:        row[5]||"",
+          direccion:    row[6]||"",
+          zona:         row[13]||"",
+          estado:       row[15]||"NUEVO",
+          ult_contacto: row[17]||"",
           ult_resultado:row[18]||"",
-          intentos:    parseFloat(row[19])||0,
-          notas:       row[20]||"",
-          vendedor:    row[21]||"",
-          vendedor_id: row[22]||"",
-          waOptIn:     row[23]==="TRUE"||row[23]===true,
-          waNumero:    row[24]||"",
-          labActual:   row[25]||"",
-          especialidad:row[29]||"",
-          fechaVisita: row[30]||"",
+          intentos:     parseFloat(row[19])||0,
+          notas:        row[20]||"",
+          vendedor:     row[21]||"",
+          vendedor_id:  row[22]||"",
+          // Also map as 'vendedor' for compatibility with filters
+          id_vendedor:  row[22]||"",
+          waOptIn:      row[23]==="TRUE"||row[23]===true,
+          waNumero:     row[24]||"",
+          labActual:    row[25]||"",
+          especialidad: row[29]||"",
+          fechaVisita:  row[30]||"",
           resultadoVisita:row[31]||"",
           proximaAccion:row[32]||"",
-          tipoAccion:  row[33]||"",
-          esCliente:   row[37]||"",
-          seguimiento: row[41]==="YES"||row[41]==="TRUE",
+          tipoAccion:   row[33]||"",
+          esCliente:    row[37]||"",
+          seguimiento:  row[41]==="YES"||row[41]==="TRUE",
           fechaCompromiso:row[42]||"",
-          score:       parseFloat(row[12])||0,
-          objecion:    "",
+          score:        parseFloat(row[12])||0,
+          objecion:     "",
           clinicaDigital:"",
-          fechaCita:   row[32]||"",
-          horaCita:    "",
+          fechaCita:    row[32]||"",
+          horaCita:     "",
         })).filter(r=>r.id&&r.nombre);
         setProspectos(rows);
         setLoadingSheet(false);
