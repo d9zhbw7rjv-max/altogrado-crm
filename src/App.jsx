@@ -3,10 +3,13 @@ import { useState, useEffect, useCallback, useRef } from "react";
 const CONFIG = {
   SHEET_ID: "1TZrxxRsaPRs6vUm9YnLLO_KjYDdCUJ6L2Vahhs9Y5GM",
   API_KEY: "AIzaSyDtSmr2Z_konxk5HjhCUH4A1_K0Md1ebZ4",
-  MAKE_WEBHOOK_E5: "https://hook.eu1.make.com/YOUR_ESCENARIO5_URL",
-  MAKE_WEBHOOK_RESULT: "https://hook.us2.make.com/aodn54hswhl3cyvynkto3f5hbhwaftna",
-  CURRENT_USER: { id: "VEND-001", name: "Areli Rios", email: "areli@altogradolabdental.com" },
+  MAKE_WEBHOOK_E5: "https://hook.us2.make.com/jyfj767nmqfnpj7uk8srlyvudficta7x",
+  MAKE_WEBHOOK_RESULT: "https://hook.eu1.make.com/YOUR_RESULTADO_URL",
+  MAKE_WEBHOOK_E7: "https://hook.us2.make.com/aodn54hswhl3cyvynkto3f5hbhwaftna",
 };
+
+// Session stored in memory — resets on app close
+let SESSION = JSON.parse(sessionStorage.getItem("ag_session") || "null");
 
 const ZONAS_LIST = ['ANZURES','AZCAPOTZALCO','BENITO JUAREZ','CENTRO','CLAVERIA',
   'CONDESA Y ROMA','COPILCO UNIVERSIDAD','COYOACAN','CUAUHTEMOC','DEL VALLE',
@@ -200,8 +203,8 @@ function ProspectoModal({p,onClose,onUpdate,onToast,plan,addNotif}){
     fechaCompromiso:p.fechaCompromiso||"",
   });
 
-  const save=()=>{
-    onUpdate(p.id,{
+  const save=async()=>{
+    const updates={
       resultadoVisita:form.resultadoVisita,notas:form.notas,
       labActual:form.labActual,objecion:form.objecion,
       clinicaDigital:form.clinicaDigital,doctor:form.nombreDoctor,
@@ -209,8 +212,33 @@ function ProspectoModal({p,onClose,onUpdate,onToast,plan,addNotif}){
       proximaAccion:form.proximaAccion,fechaCompromiso:form.fechaCompromiso,
       estado:form.resultadoVisita==="INTERESADO"?"VISITADO_INTERESADO":form.resultadoVisita==="NO_INTERESADO"?"VISITADO_NO_INTERESADO":p.estado,
       seguimiento:form.resultadoVisita==="INTERESADO",
-    });
-    onToast("✅ Guardado","success");
+    };
+    onUpdate(p.id, updates);
+    try {
+      await fetch(CONFIG.MAKE_WEBHOOK_E7,{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          accion:"registrar_visita",
+          id_prospecto:p.id,
+          resultado_visita:form.resultadoVisita,
+          notas:form.notas,
+          lab_actual:form.labActual,
+          doctor:form.nombreDoctor,
+          wa_opt_in:form.waOptIn,
+          tipo_accion:form.tipoAccion,
+          proxima_accion:form.proximaAccion,
+          clinica_digital:form.clinicaDigital,
+          objecion:form.objecion,
+          vendedor:CONFIG_USER.name,
+          id_vendedor:CONFIG_USER.id,
+          pin:session.pin,
+        })
+      });
+      onToast("✅ Visita guardada en Sheet","success");
+    } catch(e){
+      onToast("✅ Guardado localmente","info");
+    }
     onClose();
   };
 
@@ -351,7 +379,7 @@ function ProspectoModal({p,onClose,onUpdate,onToast,plan,addNotif}){
             await fetch(CONFIG.MAKE_WEBHOOK_E5,{
               method:"POST",
               headers:{"Content-Type":"application/json"},
-              body:JSON.stringify({zona:p.zona,id_vendedor:CONFIG.CURRENT_USER.id,max_llamadas:1,vendedora_en_zona:enZona})
+              body:JSON.stringify({zona:p.zona,id_vendedor:CONFIG_USER.id,max_llamadas:1,vendedora_en_zona:enZona})
             });
             addNotif({id:Date.now(),icon:"🤖",title:"Ana llamó a "+p.nombre,body:enZona?"Ana ofreció que puedes pasar hoy mismo.":"Ana intentará agendar cita.",time:"Ahora mismo",read:false});
           } catch(e){
@@ -450,7 +478,7 @@ function MapaDelDia({prospectos,onSelect,onToast,addNotif}){
     const res = await fetch(CONFIG.MAKE_WEBHOOK_E5, {
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({zona, id_vendedor:CONFIG.CURRENT_USER.id, max_llamadas:3})
+      body:JSON.stringify({zona, id_vendedor:CONFIG_USER.id, max_llamadas:3})
     });
     if(res.ok){
       onToast(`✅ Ana llamando en ${zona}`,"success");
@@ -526,7 +554,7 @@ function ListaDelDia({prospectos,onSelect}){
 
 // ── VIEW: CHECKLIST ─────────────────────────────────────────────
 function Checklist({prospectos,onSelect,onUpdate,onToast}){
-  const pend=prospectos.filter(p=>p.estado==="VISITADO_INTERESADO"&&!p.seguimiento&&p.vendedor===CONFIG.CURRENT_USER.id).sort((a,b)=>new Date(a.proximaAccion||"9999")-new Date(b.proximaAccion||"9999"));
+  const pend=prospectos.filter(p=>p.estado==="VISITADO_INTERESADO"&&!p.seguimiento&&p.vendedor===CONFIG_USER.id).sort((a,b)=>new Date(a.proximaAccion||"9999")-new Date(b.proximaAccion||"9999"));
   return(
     <div style={{height:"100%",display:"flex",flexDirection:"column"}}>
       <div style={{padding:"16px 16px 8px"}}>
@@ -557,7 +585,15 @@ function Checklist({prospectos,onSelect,onUpdate,onToast}){
                 {p.notas&&<div style={{fontSize:12,color:"#64748B",marginBottom:8,fontStyle:"italic",background:"#F8FAFC",padding:"6px 10px",borderRadius:8}}>"{p.notas}"</div>}
                 <div style={{display:"flex",gap:8}}>
                   <button onClick={e=>{e.stopPropagation();window.open(`https://wa.me/${(p.waNumero||p.telefono).replace("+","")}`,"_blank");}} style={{flex:1,padding:"8px 0",background:"#F0FDF4",color:"#10B981",border:"1.5px solid #A7F3D0",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer"}}>💬 WhatsApp</button>
-                  <button onClick={e=>{e.stopPropagation();onUpdate(p.id,{seguimiento:true});onToast("✅ Completado","success");}} style={{flex:1,padding:"8px 0",background:"#EFF6FF",color:"#0EA5E9",border:"1.5px solid #BAE6FD",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer"}}>✅ Hecho</button>
+                  <button onClick={async e=>{
+  e.stopPropagation();
+  onUpdate(p.id,{seguimiento:true});
+  try{
+    await fetch(CONFIG.MAKE_WEBHOOK_E7,{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({accion:"completar_seguimiento",id_prospecto:p.id,id_vendedor:CONFIG_USER.id,pin:session.pin})});
+    onToast("✅ Completado y guardado","success");
+  }catch(e){onToast("✅ Completado","success");}
+}} style={{flex:1,padding:"8px 0",background:"#EFF6FF",color:"#0EA5E9",border:"1.5px solid #BAE6FD",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer"}}>✅ Hecho</button>
                 </div>
               </div>
             );
@@ -638,7 +674,17 @@ function PlanSemanal({prospectos,onToast}){
         })}
 
         {!plan[active]?.locked&&(
-          <button onClick={()=>onToast("💾 Plan guardado","success")} style={{width:"100%",padding:"14px",background:"linear-gradient(135deg,#0EA5E9,#8B5CF6)",color:"white",border:"none",borderRadius:12,fontSize:15,fontWeight:700,cursor:"pointer",marginTop:4}}>
+          <button onClick={()=>onToast("💾 Plan guardado","success")} style={{width:"100%",padding:"14px",background:"linear-gradient(135deg,#0EA5E9,#8B5CF6)",color:"white",border:"none",borderRadius:12,fontSize:15,fontWeight:700,cursor:"pointer",marginTop:4}} onClick={async()=>{
+            try{
+              await fetch(CONFIG.MAKE_WEBHOOK_E7,{method:"POST",headers:{"Content-Type":"application/json"},
+                body:JSON.stringify({accion:"plan_semanal",semana:active,id_vendedor:CONFIG_USER.id,
+                  lunes:plan[active]?.LUNES||"",martes:plan[active]?.MARTES||"",
+                  miercoles:plan[active]?.MIÉRCOLES||"",jueves:plan[active]?.JUEVES||"",
+                  viernes:plan[active]?.VIERNES||"",pin:session.pin})
+              });
+              onToast("💾 Plan guardado en Sheet","success");
+            }catch(e){onToast("💾 Plan guardado","success");}
+          }}>
             💾 Guardar Plan
           </button>
         )}
@@ -655,11 +701,28 @@ function NuevaClinica({onToast,addNotif,prospectos}){
   const inp={width:"100%",padding:"10px 12px",border:"1.5px solid #E2E8F0",borderRadius:10,fontSize:14,outline:"none",boxSizing:"border-box"};
   const lbl={fontSize:12,color:"#64748B",marginBottom:4,display:"block",fontWeight:600};
 
-  const handleSave=(andCall=false)=>{
+  const handleSave=async(andCall=false)=>{
     if(!form.nombre||!form.telefono){onToast("⚠️ Nombre y teléfono requeridos","error");return;}
-    onToast("✅ Clínica agregada","success");
+    try{
+      await fetch(CONFIG.MAKE_WEBHOOK_E7,{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          accion:"nueva_clinica",
+          nombre:form.nombre,telefono:form.telefono,
+          direccion:form.direccion,zona:form.zona,
+          notas:form.notas,doctor:form.doctor,
+          lab_actual:form.labActual,resultado_visita:form.resultadoVisita,
+          wa_opt_in:form.waOptIn,tipo_accion:form.tipoAccion,
+          proxima_accion:form.proximaAccion,clinica_digital:form.clinicaDigital,
+          objecion:form.objecion,vendedor:CONFIG_USER.name,
+          id_vendedor:CONFIG_USER.id,pin:session.pin,
+        })
+      });
+      onToast("✅ Clínica guardada en Sheet","success");
+    }catch(e){onToast("✅ Clínica agregada","success");}
     if(andCall){
       setTimeout(()=>{
+        fetch(CONFIG.MAKE_WEBHOOK_E5,{method:"POST",headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({zona:form.zona,id_vendedor:CONFIG_USER.id,max_llamadas:1})});
         onToast("🤖 Ana está llamando a "+form.nombre,"info");
         addNotif({id:Date.now(),icon:"🤖",title:"Ana llamó a "+form.nombre,body:"Te avisamos cuando complete la llamada.",time:"Ahora mismo",read:false});
       },800);
@@ -795,7 +858,7 @@ function NuevaClinica({onToast,addNotif,prospectos}){
                 </div>
                 <button onClick={async()=>{
   try {
-    await fetch(CONFIG.MAKE_WEBHOOK_E5,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({zona:p.zona,id_vendedor:CONFIG.CURRENT_USER.id,max_llamadas:1})});
+    await fetch(CONFIG.MAKE_WEBHOOK_E5,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({zona:p.zona,id_vendedor:CONFIG_USER.id,max_llamadas:1})});
     addNotif({id:Date.now(),icon:"🤖",title:"Ana llamó a "+p.nombre,body:"Te notificamos cuando termine.",time:"Ahora mismo",read:false});
   } catch(e){}
 }} style={{padding:"6px 12px",background:"#8B5CF6",color:"white",border:"none",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer"}}>
@@ -810,8 +873,101 @@ function NuevaClinica({onToast,addNotif,prospectos}){
   );
 }
 
+
+// ── LOGIN SCREEN ───────────────────────────────────────────────
+function LoginScreen({onLogin}){
+  const [idVendedor,setIdVendedor]=useState("");
+  const [pin,setPin]=useState("");
+  const [error,setError]=useState("");
+  const [loading,setLoading]=useState(false);
+
+  const VENDEDORES_IDS = ["VEND-001","VEND-002","VEND-003","VEND-004"];
+
+  const handleLogin=async()=>{
+    if(!idVendedor||!pin){setError("Completa todos los campos");return;}
+    setLoading(true);setError("");
+    try{
+      // Verify PIN against Vendedores sheet
+      const sheetId = CONFIG.SHEET_ID;
+      const apiKey = CONFIG.API_KEY;
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent("👥 Vendedores!A6:K20")}?key=${apiKey}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if(!data.values){setError("Error conectando al sistema");setLoading(false);return;}
+      
+      const vendedor = data.values.find(row=>row[0]===idVendedor);
+      if(!vendedor){setError("ID de vendedor no encontrado");setLoading(false);return;}
+      
+      const pinCorrecto = vendedor[10]; // col K = PIN
+      if(pin!==String(pinCorrecto)){setError("PIN incorrecto");setLoading(false);return;}
+      
+      const session = {
+        id_vendedor: vendedor[0],
+        nombre: vendedor[1],
+        email: vendedor[3]||"",
+        pin: pin,
+      };
+      sessionStorage.setItem("ag_session", JSON.stringify(session));
+      onLogin(session);
+    }catch(e){
+      setError("Error de conexión");
+    }
+    setLoading(false);
+  };
+
+  return(
+    <div style={{maxWidth:480,margin:"0 auto",height:"100dvh",display:"flex",flexDirection:"column",fontFamily:"'DM Sans',-apple-system,sans-serif",background:"linear-gradient(135deg,#0F172A 0%,#1E293B 100%)"}}>
+      <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"0 32px"}}>
+        {/* Logo */}
+        <div style={{width:72,height:72,background:"linear-gradient(135deg,#0EA5E9,#8B5CF6)",borderRadius:20,display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,fontWeight:900,color:"white",marginBottom:24,boxShadow:"0 8px 32px rgba(14,165,233,0.3)"}}>AG</div>
+        <div style={{fontSize:24,fontWeight:800,color:"white",marginBottom:6}}>AltoGrado CRM</div>
+        <div style={{fontSize:14,color:"#64748B",marginBottom:40}}>Ingresa tus credenciales</div>
+
+        {/* Form */}
+        <div style={{width:"100%",display:"flex",flexDirection:"column",gap:14}}>
+          <div>
+            <label style={{fontSize:12,color:"#94A3B8",marginBottom:6,display:"block",fontWeight:600}}>ID de Vendedor</label>
+            <select value={idVendedor} onChange={e=>setIdVendedor(e.target.value)}
+              style={{width:"100%",padding:"14px 16px",background:"#1E293B",border:"1.5px solid #334155",borderRadius:12,fontSize:15,color:"white",outline:"none",boxSizing:"border-box"}}>
+              <option value="">Selecciona tu ID...</option>
+              {VENDEDORES_IDS.map(id=><option key={id} value={id}>{id}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label style={{fontSize:12,color:"#94A3B8",marginBottom:6,display:"block",fontWeight:600}}>PIN</label>
+            <input type="password" value={pin} onChange={e=>setPin(e.target.value)}
+              placeholder="••••" maxLength={6}
+              onKeyDown={e=>e.key==="Enter"&&handleLogin()}
+              style={{width:"100%",padding:"14px 16px",background:"#1E293B",border:"1.5px solid #334155",borderRadius:12,fontSize:20,color:"white",outline:"none",boxSizing:"border-box",letterSpacing:8,textAlign:"center"}}/>
+          </div>
+
+          {error&&<div style={{padding:"10px 14px",background:"#FEE2E2",borderRadius:10,fontSize:13,color:"#DC2626",fontWeight:600,textAlign:"center"}}>{error}</div>}
+
+          <button onClick={handleLogin} disabled={loading} style={{width:"100%",padding:"16px",background:loading?"#334155":"linear-gradient(135deg,#0EA5E9,#8B5CF6)",color:"white",border:"none",borderRadius:12,fontSize:16,fontWeight:700,cursor:loading?"not-allowed":"pointer",marginTop:8}}>
+            {loading?"Verificando...":"Entrar →"}
+          </button>
+        </div>
+
+        <div style={{marginTop:32,fontSize:12,color:"#475569",textAlign:"center"}}>
+          ¿Olvidaste tu PIN? Contacta a tu coordinador.
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── MAIN APP ───────────────────────────────────────────────────
 export default function App(){
+  const [session,setSession]=useState(SESSION);
+
+  if(!session) return <LoginScreen onLogin={s=>{SESSION=s;setSession(s);}}/>;
+
+  return <AppMain session={session} onLogout={()=>{sessionStorage.removeItem("ag_session");SESSION=null;setSession(null);}}/>;
+}
+
+function AppMain({session,onLogout}){
+  const CONFIG_USER = { id: session.id_vendedor, name: session.nombre, email: session.email };
   const [view,setView]=useState("mapa");
   const [selected,setSelected]=useState(null);
   const [toast,setToast]=useState(null);
@@ -886,7 +1042,7 @@ export default function App(){
 
   const unread=notifs.filter(n=>!n.read).length;
   const citasHoy=prospectos.filter(p=>p.estado==="CITA_AGENDADA"&&p.fechaCita===fmt(today)).length;
-  const checkCount=prospectos.filter(p=>p.estado==="VISITADO_INTERESADO"&&!p.seguimiento&&p.vendedor===CONFIG.CURRENT_USER.id).length;
+  const checkCount=prospectos.filter(p=>p.estado==="VISITADO_INTERESADO"&&!p.seguimiento&&p.vendedor===CONFIG_USER.id).length;
 
   const showToast=useCallback((msg,type="info")=>setToast({message:msg,type}),[]);
   const addNotif=useCallback(n=>setNotifs(prev=>[n,...prev]),[]);
@@ -927,7 +1083,7 @@ export default function App(){
             <span style={{fontSize:22}}>🔔</span>
             {unread>0&&<span style={{position:"absolute",top:0,right:0,background:"#EF4444",color:"white",borderRadius:10,fontSize:9,fontWeight:700,padding:"1px 5px",minWidth:14,textAlign:"center"}}>{unread}</span>}
           </button>
-          <Avatar name={CONFIG.CURRENT_USER.name} size={34}/>
+          <Avatar name={CONFIG_USER.name} size={34}/>
         </div>
       </div>
 
