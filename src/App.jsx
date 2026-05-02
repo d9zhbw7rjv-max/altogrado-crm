@@ -4,7 +4,7 @@ const CONFIG = {
   SHEET_ID: "1TZrxxRsaPRs6vUm9YnLLO_KjYDdCUJ6L2Vahhs9Y5GM",
   API_KEY: "AIzaSyDtSmr2Z_konxk5HjhCUH4A1_K0Md1ebZ4",
   MAKE_WEBHOOK_E5: "https://hook.eu1.make.com/YOUR_ESCENARIO5_URL",
-  MAKE_WEBHOOK_RESULT: "https://hook.eu1.make.com/YOUR_RESULTADO_URL",
+  MAKE_WEBHOOK_RESULT: "https://hook.us2.make.com/aodn54hswhl3cyvynkto3f5hbhwaftna",
   CURRENT_USER: { id: "VEND-001", name: "Areli Rios", email: "areli@altogradolabdental.com" },
 };
 
