@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 const CONFIG = {
   SHEET_ID: "YOUR_GOOGLE_SHEET_ID",
   API_KEY: "YOUR_GOOGLE_SHEETS_API_KEY",
-  MAKE_WEBHOOK_E5: "https://hook.us2.make.com/jyfj767nmqfnpj7uk8srlyvudficta7x",
+  MAKE_WEBHOOK_E5: "https://hook.eu1.make.com/YOUR_ESCENARIO5_URL",
   MAKE_WEBHOOK_RESULT: "https://hook.eu1.make.com/YOUR_RESULTADO_URL",
   CURRENT_USER: { id: "VEND-001", name: "Areli Rios", email: "areli@altogradolabdental.com" },
 };
@@ -798,6 +798,66 @@ export default function App(){
     {id:2,icon:"📅",title:"Plan semanal sincronizado",body:"Make actualizó los slots del calendario.",time:"Hace 1h",read:true},
   ]);
   const [prospectos,setProspectos]=useState(MOCK);
+  const [loadingSheet,setLoadingSheet]=useState(false);
+  const [sheetError,setSheetError]=useState(null);
+
+  useEffect(()=>{
+    const sheetId = CONFIG.SHEET_ID;
+    const apiKey = CONFIG.API_KEY;
+    if(sheetId==="YOUR_GOOGLE_SHEET_ID"||apiKey==="YOUR_GOOGLE_SHEETS_API_KEY"){
+      console.log("Using mock data — configure SHEET_ID and API_KEY to use real data");
+      return;
+    }
+    setLoadingSheet(true);
+    // Fetch from row 7 onwards (headers in row 6)
+    const range = "📋 Prospectos!A7:AQ";
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(range)}?key=${apiKey}`;
+    fetch(url)
+      .then(r=>r.json())
+      .then(data=>{
+        if(!data.values){setSheetError("No se pudieron cargar los datos");return;}
+        const rows = data.values.map(row=>({
+          id:          row[0]||"",
+          nombre:      row[1]||"",
+          doctor:      row[2]||"",
+          telefono:    row[3]||"",
+          email:       row[5]||"",
+          direccion:   row[6]||"",
+          zona:        row[13]||"",
+          estado:      row[15]||"NUEVO",
+          ult_contacto:row[17]||"",
+          ult_resultado:row[18]||"",
+          intentos:    parseFloat(row[19])||0,
+          notas:       row[20]||"",
+          vendedor:    row[21]||"",
+          vendedor_id: row[22]||"",
+          waOptIn:     row[23]==="TRUE"||row[23]===true,
+          waNumero:    row[24]||"",
+          labActual:   row[25]||"",
+          especialidad:row[29]||"",
+          fechaVisita: row[30]||"",
+          resultadoVisita:row[31]||"",
+          proximaAccion:row[32]||"",
+          tipoAccion:  row[33]||"",
+          esCliente:   row[37]||"",
+          seguimiento: row[41]==="YES"||row[41]==="TRUE",
+          fechaCompromiso:row[42]||"",
+          score:       parseFloat(row[12])||0,
+          objecion:    "",
+          clinicaDigital:"",
+          fechaCita:   row[32]||"",
+          horaCita:    "",
+        })).filter(r=>r.id&&r.nombre);
+        setProspectos(rows);
+        setLoadingSheet(false);
+        console.log(`✅ Cargados ${rows.length} prospectos del Sheet`);
+      })
+      .catch(e=>{
+        console.error("Error loading Sheet:",e);
+        setSheetError("Error de conexión al Sheet");
+        setLoadingSheet(false);
+      });
+  },[]);
 
   const unread=notifs.filter(n=>!n.read).length;
   const citasHoy=prospectos.filter(p=>p.estado==="CITA_AGENDADA"&&p.fechaCita===fmt(today)).length;
@@ -833,7 +893,7 @@ export default function App(){
           <div>
             <div style={{fontSize:15,fontWeight:700,color:"white"}}>AltoGrado CRM</div>
             <div style={{fontSize:11,color:"#64748B"}}>
-              {view==="mapa"?`${citasHoy} citas hoy`:view==="lista"?`${prospectos.filter(p=>p.estado!=="CLIENTE_ACTIVO").length} prospectos`:view==="checklist"?`${checkCount} pendientes`:view==="plan"?"Plan semanal":"Nueva clínica"}
+              {loadingSheet?"⏳ Cargando datos...":sheetError?`⚠️ ${sheetError}`:view==="mapa"?`${citasHoy} citas hoy`:view==="lista"?`${prospectos.filter(p=>p.estado!=="CLIENTE_ACTIVO").length} prospectos`:view==="checklist"?`${checkCount} pendientes`:view==="plan"?"Plan semanal":"Nueva clínica"}
             </div>
           </div>
         </div>
