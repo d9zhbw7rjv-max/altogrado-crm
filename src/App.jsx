@@ -364,22 +364,45 @@ function ProspectoModal({p,onClose,onUpdate,onToast,plan,addNotif}){
 
 // ── VIEW: MAPA DEL DÍA ─────────────────────────────────────────
 function MapaDelDia({prospectos,onSelect,onToast,addNotif}){
+  const [vistaFecha,setVistaFecha]=useState("hoy");
+  const startOfWeek=new Date(today);
+  startOfWeek.setDate(today.getDate()-today.getDay()+1);
+  const endOfWeek=new Date(startOfWeek);
+  endOfWeek.setDate(startOfWeek.getDate()+6);
+  const fmtShort=d=>d.toLocaleDateString("es-MX",{weekday:"short",day:"numeric",month:"short"});
+
   const citasHoy=prospectos.filter(p=>p.estado==="CITA_AGENDADA"&&p.fechaCita===fmt(today)).sort((a,b)=>(a.horaCita||"").localeCompare(b.horaCita||""));
+  const citasSemana=prospectos.filter(p=>{
+    if(p.estado!=="CITA_AGENDADA"||!p.fechaCita) return false;
+    const d=new Date(p.fechaCita+"T12:00:00");
+    return d>=startOfWeek&&d<=endOfWeek;
+  }).sort((a,b)=>{
+    if(a.fechaCita!==b.fechaCita) return a.fechaCita.localeCompare(b.fechaCita);
+    return (a.horaCita||"").localeCompare(b.horaCita||"");
+  });
+  const citasMostrar=vistaFecha==="hoy"?citasHoy:citasSemana;
   const zonas=[...new Set(prospectos.filter(p=>p.estado!=="CLIENTE_ACTIVO"&&p.estado!=="DESCARTADO").map(p=>p.zona))].slice(0,6);
 
   return(
     <div style={{height:"100%",overflowY:"auto",padding:"0 0 80px"}}>
       <div style={{padding:"16px 16px 8px"}}>
         <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
-          <div style={{fontSize:15,fontWeight:700,color:"#0F172A"}}>Citas de hoy</div>
-          <span style={{background:"#D1FAE5",color:"#059669",borderRadius:12,padding:"2px 8px",fontSize:12,fontWeight:700}}>{citasHoy.length} citas</span>
-          <div style={{fontSize:12,color:"#64748B",marginLeft:"auto"}}>{today.toLocaleDateString("es-MX",{weekday:"long",day:"numeric",month:"long"})}</div>
+          <div style={{fontSize:15,fontWeight:700,color:"#0F172A"}}>{vistaFecha==="hoy"?"Citas de hoy":"Citas de la semana"}</div>
+          <span style={{background:"#D1FAE5",color:"#059669",borderRadius:12,padding:"2px 8px",fontSize:12,fontWeight:700}}>{citasMostrar.length} citas</span>
+          <div style={{fontSize:12,color:"#64748B",marginLeft:"auto"}}>{vistaFecha==="hoy"?today.toLocaleDateString("es-MX",{weekday:"long",day:"numeric",month:"long"}):fmtShort(startOfWeek)+" - "+fmtShort(endOfWeek)}</div>
         </div>
-        {citasHoy.length===0
-          ?<div style={{padding:"20px",background:"#F8FAFC",borderRadius:14,textAlign:"center",color:"#94A3B8"}}><div style={{fontSize:24,marginBottom:6}}>📅</div><div style={{fontSize:13}}>No hay citas para hoy</div></div>
+        <div style={{display:"flex",background:"#F1F5F9",borderRadius:10,padding:3,marginBottom:12}}>
+          {[{v:"hoy",l:"Hoy",count:citasHoy.length},{v:"semana",l:"Esta semana",count:citasSemana.length}].map(opt=>(
+            <button key={opt.v} onClick={()=>setVistaFecha(opt.v)} style={{flex:1,padding:"8px",background:vistaFecha===opt.v?"white":"transparent",border:"none",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",color:vistaFecha===opt.v?"#0F172A":"#94A3B8",boxShadow:vistaFecha===opt.v?"0 1px 4px rgba(0,0,0,0.1)":"none"}}>
+              {opt.l} {opt.count>0&&<span style={{background:vistaFecha===opt.v?"#D1FAE5":"#E2E8F0",color:vistaFecha===opt.v?"#059669":"#64748B",borderRadius:10,padding:"1px 6px",fontSize:10,fontWeight:700}}>{opt.count}</span>}
+            </button>
+          ))}
+        </div>
+        {citasMostrar.length===0
+          ?<div style={{padding:"20px",background:"#F8FAFC",borderRadius:14,textAlign:"center",color:"#94A3B8"}}><div style={{fontSize:24,marginBottom:6}}>📅</div><div style={{fontSize:13}}>No hay citas {vistaFecha==="hoy"?"para hoy":"esta semana"}</div></div>
           :<div style={{position:"relative",paddingLeft:28}}>
             <div style={{position:"absolute",left:10,top:20,bottom:20,width:2,background:"linear-gradient(180deg,#0EA5E9,#8B5CF6)",borderRadius:2}}/>
-            {citasHoy.map(c=>(
+            {citasMostrar.map(c=>(
               <div key={c.id} onClick={()=>onSelect(c)} style={{marginBottom:12,cursor:"pointer",position:"relative"}}>
                 <div style={{position:"absolute",left:-18,width:16,height:16,borderRadius:"50%",background:"#0EA5E9",border:"3px solid white",boxShadow:"0 0 0 2px #0EA5E9",marginTop:16}}/>
                 <div style={{padding:"12px 14px",background:"white",borderRadius:12,boxShadow:"0 2px 8px rgba(0,0,0,0.08)",border:"1.5px solid #E0F2FE"}}>
@@ -407,7 +430,7 @@ function MapaDelDia({prospectos,onSelect,onToast,addNotif}){
           <div style={{fontSize:13,fontWeight:600}}>Mapa de citas del día</div>
           <div style={{fontSize:12}}>Conectar Google Maps API</div>
         </div>
-        {citasHoy.map((c,i)=>(
+        {citasMostrar.map((c,i)=>(
           <div key={c.id} style={{position:"absolute",top:`${15+i*25}%`,left:`${15+i*22}%`,background:"#10B981",color:"white",borderRadius:"50% 50% 50% 0",width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,boxShadow:"0 2px 8px rgba(0,0,0,0.3)",transform:"rotate(-45deg)"}}>
             <span style={{transform:"rotate(45deg)"}}>{c.horaCita?.split(":")[0]||i+1}</span>
           </div>
@@ -457,7 +480,7 @@ function ListaDelDia({prospectos,onSelect}){
   const [filter,setFilter]=useState("TODOS");
   const QUICK=["TODOS","NUEVO","CITA_AGENDADA","VISITADO_INTERESADO","LLAMADA_PENDIENTE"];
   const filtered=prospectos
-    .filter(p=>(p.vendedor_id===CONFIG.CURRENT_USER.id||p.id_vendedor===CONFIG.CURRENT_USER.id||p.vendedor===CONFIG.CURRENT_USER.name||true)&&p.estado!=="CLIENTE_ACTIVO"&&p.estado!=="DESCARTADO")
+    .filter(p=>p.estado!=="CLIENTE_ACTIVO"&&p.estado!=="DESCARTADO")
     .filter(p=>!search||p.nombre.toLowerCase().includes(search.toLowerCase())||p.zona.toLowerCase().includes(search.toLowerCase()))
     .filter(p=>filter==="TODOS"||p.estado===filter)
     .sort((a,b)=>b.score-a.score);
