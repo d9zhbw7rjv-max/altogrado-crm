@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
 const CONFIG = {
-  SHEET_ID: "YOUR_GOOGLE_SHEET_ID",
-  API_KEY: "YOUR_GOOGLE_SHEETS_API_KEY",
+  SHEET_ID: "1TZrxxRsaPRs6vUm9YnLLO_KjYDdCUJ6L2Vahhs9Y5GM",
+  API_KEY: "AIzaSyDtSmr2Z_konxk5HjhCUH4A1_K0Md1ebZ4",
   MAKE_WEBHOOK_E5: "https://hook.eu1.make.com/YOUR_ESCENARIO5_URL",
   MAKE_WEBHOOK_RESULT: "https://hook.eu1.make.com/YOUR_RESULTADO_URL",
   CURRENT_USER: { id: "VEND-001", name: "Areli Rios", email: "areli@altogradolabdental.com" },
