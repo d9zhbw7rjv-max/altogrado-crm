@@ -891,15 +891,19 @@ function LoginScreen({onLogin}){
       const sheetId = CONFIG.SHEET_ID;
       const apiKey = CONFIG.API_KEY;
       const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent("👥 Vendedores!A6:K20")}?key=${apiKey}`;
+      console.log("Fetching vendedores:", url);
       const res = await fetch(url);
       const data = await res.json();
-      if(!data.values){setError("Error conectando al sistema");setLoading(false);return;}
+      console.log("Vendedores data:", data);
+      if(!data.values){setError("Error conectando al sistema: "+JSON.stringify(data.error?.message||"sin datos"));setLoading(false);return;}
       
       const vendedor = data.values.find(row=>row[0]===idVendedor);
-      if(!vendedor){setError("ID de vendedor no encontrado");setLoading(false);return;}
+      console.log("Vendedor encontrado:", vendedor);
+      if(!vendedor){setError("ID "+idVendedor+" no encontrado en el Sheet");setLoading(false);return;}
       
       const pinCorrecto = vendedor[10]; // col K = PIN
-      if(pin!==String(pinCorrecto)){setError("PIN incorrecto");setLoading(false);return;}
+      console.log("PIN esperado:", pinCorrecto, "PIN ingresado:", pin);
+      if(pin!==String(pinCorrecto)){setError("PIN incorrecto. Esperado: "+pinCorrecto);setLoading(false);return;}
       
       const session = {
         id_vendedor: vendedor[0],
