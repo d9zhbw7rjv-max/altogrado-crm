@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 const CONFIG = {
   SHEET_ID: "1TZrxxRsaPRs6vUm9YnLLO_KjYDdCUJ6L2Vahhs9Y5GM",
   API_KEY: "AIzaSyDtSmr2Z_konxk5HjhCUH4A1_K0Md1ebZ4",
+  MAPS_KEY: import.meta.env.VITE_MAPS_KEY || "AIzaSyDtSmr2Z_konxk5HjhCUH4A1_K0Md1ebZ4",
   MAKE_WEBHOOK_E5: "https://hook.us2.make.com/jyfj767nmqfnpj7uk8srlyvudficta7x",
   MAKE_WEBHOOK_RESULT: "https://hook.eu1.make.com/YOUR_RESULTADO_URL",
   MAKE_WEBHOOK_E7: "https://hook.us2.make.com/aodn54hswhl3cyvynkto3f5hbhwaftna",
@@ -451,18 +452,32 @@ function MapaDelDia({prospectos,onSelect,onToast,addNotif}){
         }
       </div>
 
-      {/* Mapa */}
-      <div style={{margin:"8px 16px",borderRadius:16,overflow:"hidden",border:"1.5px solid #E2E8F0",position:"relative",height:180,background:"linear-gradient(135deg,#E8F5E9,#E3F2FD)",display:"flex",alignItems:"center",justifyContent:"center"}}>
-        <div style={{textAlign:"center",color:"#64748B"}}>
-          <div style={{fontSize:28,marginBottom:6}}>🗺️</div>
-          <div style={{fontSize:13,fontWeight:600}}>Mapa de citas del día</div>
-          <div style={{fontSize:12}}>Conectar Google Maps API</div>
-        </div>
-        {citasMostrar.map((c,i)=>(
-          <div key={c.id} style={{position:"absolute",top:`${15+i*25}%`,left:`${15+i*22}%`,background:"#10B981",color:"white",borderRadius:"50% 50% 50% 0",width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,boxShadow:"0 2px 8px rgba(0,0,0,0.3)",transform:"rotate(-45deg)"}}>
-            <span style={{transform:"rotate(45deg)"}}>{c.horaCita?.split(":")[0]||i+1}</span>
+      {/* Mapa Google Maps */}
+      <div style={{margin:"8px 16px",borderRadius:16,overflow:"hidden",border:"1.5px solid #E2E8F0",position:"relative",height:220}}>
+        {CONFIG.MAPS_KEY ? (
+          <iframe
+            title="Mapa citas"
+            width="100%"
+            height="220"
+            style={{border:0,display:"block"}}
+            loading="lazy"
+            allowFullScreen
+            src={`https://www.google.com/maps/embed/v1/search?key=${CONFIG.MAPS_KEY}&q=${encodeURIComponent(citasMostrar.map(c=>c.direccion).filter(Boolean).join("|")||"Ciudad de México")}&zoom=12`}
+          />
+        ) : (
+          <div style={{height:220,background:"linear-gradient(135deg,#E8F5E9,#E3F2FD)",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:8,color:"#64748B"}}>
+            <div style={{fontSize:28}}>🗺️</div>
+            <div style={{fontSize:13,fontWeight:600}}>Configura VITE_MAPS_KEY en Vercel</div>
           </div>
-        ))}
+        )}
+        {/* Citas overlay */}
+        <div style={{position:"absolute",bottom:8,left:8,right:8,display:"flex",gap:6,overflowX:"auto"}}>
+          {citasMostrar.map(c=>(
+            <div key={c.id} style={{flexShrink:0,background:"white",borderRadius:8,padding:"4px 8px",fontSize:11,fontWeight:700,color:"#0EA5E9",boxShadow:"0 2px 8px rgba(0,0,0,0.15)",whiteSpace:"nowrap"}}>
+              🕐 {c.horaCita||"?"} · {c.nombre?.split(" ").slice(0,2).join(" ")}
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Llamar por zona */}
