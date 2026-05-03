@@ -890,7 +890,7 @@ function LoginScreen({onLogin}){
       // Verify PIN against Vendedores sheet
       const sheetId = CONFIG.SHEET_ID;
       const apiKey = CONFIG.API_KEY;
-      const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent("👥 Vendedores!A6:K20")}?key=${apiKey}`;
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent("👥 Vendedores!A2:K20")}?key=${apiKey}`;
       console.log("Fetching vendedores:", url);
       const res = await fetch(url);
       const data = await res.json();
@@ -993,7 +993,7 @@ function AppMain({session,onLogout}){
     }
     setLoadingSheet(true);
     // Fetch from row 7 onwards (headers in row 6)
-    const range = "📋 Prospectos!A7:AQ";
+    const range = "📋 Prospectos!A2:AQ";
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(range)}?key=${apiKey}`;
     fetch(url)
       .then(r=>r.json())
