@@ -410,7 +410,7 @@ function MapaDelDia({prospectos,onSelect,onToast,addNotif}){
     return (a.horaCita||"").localeCompare(b.horaCita||"");
   });
   const citasMostrar=vistaFecha==="hoy"?citasHoy:citasSemana;
-  const zonas=[...new Set(prospectos.filter(p=>p.estado!=="CLIENTE_ACTIVO"&&p.estado!=="DESCARTADO").map(p=>p.zona))].slice(0,6);
+  const zonas=[...new Set(prospectos.filter(p=>p.estado!=="CLIENTE_ACTIVO"&&p.estado!=="DESCARTADO"&&(p.vendedor_id===CONFIG_USER.id||p.id_vendedor===CONFIG_USER.id)).map(p=>p.zona))].slice(0,6);
 
   return(
     <div style={{height:"100%",overflowY:"auto",padding:"0 0 80px"}}>
@@ -540,7 +540,7 @@ function ListaDelDia({prospectos,onSelect}){
   const [filter,setFilter]=useState("TODOS");
   const QUICK=["TODOS","NUEVO","CITA_AGENDADA","VISITADO_INTERESADO","LLAMADA_PENDIENTE"];
   const filtered=prospectos
-    .filter(p=>p.estado!=="CLIENTE_ACTIVO"&&p.estado!=="DESCARTADO")
+    .filter(p=>p.estado!=="CLIENTE_ACTIVO"&&p.estado!=="DESCARTADO"&&(p.vendedor_id===CONFIG_USER.id||p.id_vendedor===CONFIG_USER.id))
     .filter(p=>!search||p.nombre.toLowerCase().includes(search.toLowerCase())||p.zona.toLowerCase().includes(search.toLowerCase()))
     .filter(p=>filter==="TODOS"||p.estado===filter)
     .sort((a,b)=>b.score-a.score);
@@ -586,7 +586,7 @@ function ListaDelDia({prospectos,onSelect}){
 
 // ── VIEW: CHECKLIST ─────────────────────────────────────────────
 function Checklist({prospectos,onSelect,onUpdate,onToast}){
-  const pend=prospectos.filter(p=>p.estado==="VISITADO_INTERESADO"&&!p.seguimiento&&p.vendedor===CONFIG_USER.id).sort((a,b)=>new Date(a.proximaAccion||"9999")-new Date(b.proximaAccion||"9999"));
+  const pend=prospectos.filter(p=>p.estado==="VISITADO_INTERESADO"&&!p.seguimiento&&(p.vendedor_id===CONFIG_USER.id||p.id_vendedor===CONFIG_USER.id)).sort((a,b)=>new Date(a.proximaAccion||"9999")-new Date(b.proximaAccion||"9999"));
   return(
     <div style={{height:"100%",display:"flex",flexDirection:"column"}}>
       <div style={{padding:"16px 16px 8px"}}>
