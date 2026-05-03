@@ -11,6 +11,8 @@ const CONFIG = {
 
 // Session stored in memory — resets on app close
 let SESSION = JSON.parse(sessionStorage.getItem("ag_session") || "null");
+// Global user config - updated on login
+let CONFIG_USER = SESSION ? { id: SESSION.id_vendedor, name: SESSION.nombre, email: SESSION.email } : { id: "", name: "", email: "" };
 
 const ZONAS_LIST = ['ANZURES','AZCAPOTZALCO','BENITO JUAREZ','CENTRO','CLAVERIA',
   'CONDESA Y ROMA','COPILCO UNIVERSIDAD','COYOACAN','CUAUHTEMOC','DEL VALLE',
@@ -535,12 +537,12 @@ function MapaDelDia({prospectos,onSelect,onToast,addNotif}){
 }
 
 // ── VIEW: LISTA ─────────────────────────────────────────────────
-function ListaDelDia({prospectos,onSelect}){
+function ListaDelDia({prospectos,onSelect,vendorId}){
   const [search,setSearch]=useState("");
   const [filter,setFilter]=useState("TODOS");
   const QUICK=["TODOS","NUEVO","CITA_AGENDADA","VISITADO_INTERESADO","LLAMADA_PENDIENTE"];
   const filtered=prospectos
-    .filter(p=>p.estado!=="CLIENTE_ACTIVO"&&p.estado!=="DESCARTADO"&&(p.vendedor_id===CONFIG_USER.id||p.id_vendedor===CONFIG_USER.id))
+    .filter(p=>p.estado!=="CLIENTE_ACTIVO"&&p.estado!=="DESCARTADO"&&(vendorId?p.vendedor_id===vendorId||p.id_vendedor===vendorId:true))
     .filter(p=>!search||p.nombre.toLowerCase().includes(search.toLowerCase())||p.zona.toLowerCase().includes(search.toLowerCase()))
     .filter(p=>filter==="TODOS"||p.estado===filter)
     .sort((a,b)=>b.score-a.score);
@@ -585,7 +587,7 @@ function ListaDelDia({prospectos,onSelect}){
 }
 
 // ── VIEW: CHECKLIST ─────────────────────────────────────────────
-function Checklist({prospectos,onSelect,onUpdate,onToast}){
+function Checklist({prospectos,onSelect,onUpdate,onToast,vendorId}){
   const pend=prospectos.filter(p=>p.estado==="VISITADO_INTERESADO"&&!p.seguimiento&&(p.vendedor_id===CONFIG_USER.id||p.id_vendedor===CONFIG_USER.id)).sort((a,b)=>new Date(a.proximaAccion||"9999")-new Date(b.proximaAccion||"9999"));
   return(
     <div style={{height:"100%",display:"flex",flexDirection:"column"}}>
@@ -1003,7 +1005,8 @@ export default function App(){
 }
 
 function AppMain({session,onLogout}){
-  const CONFIG_USER = { id: session.id_vendedor, name: session.nombre, email: session.email };
+  // Update global CONFIG_USER when session changes
+  CONFIG_USER = { id: session.id_vendedor, name: session.nombre, email: session.email };
   const [view,setView]=useState("mapa");
   const [selected,setSelected]=useState(null);
   const [toast,setToast]=useState(null);
@@ -1126,8 +1129,8 @@ function AppMain({session,onLogout}){
       {/* Content */}
       <div style={{flex:1,overflow:"hidden"}}>
         {view==="mapa"&&<MapaDelDia prospectos={prospectos} onSelect={setSelected} onToast={showToast} addNotif={addNotif}/>}
-        {view==="lista"&&<ListaDelDia prospectos={prospectos} onSelect={setSelected}/>}
-        {view==="checklist"&&<Checklist prospectos={prospectos} onSelect={setSelected} onUpdate={updateP} onToast={showToast}/>}
+        {view==="lista"&&<ListaDelDia prospectos={prospectos} onSelect={setSelected} vendorId={CONFIG_USER.id}/>}
+        {view==="checklist"&&<Checklist prospectos={prospectos} onSelect={setSelected} onUpdate={updateP} onToast={showToast} vendorId={CONFIG_USER.id}/>}
         {view==="plan"&&<PlanSemanal prospectos={prospectos} onToast={showToast}/>}
         {view==="nueva"&&<NuevaClinica onToast={showToast} addNotif={addNotif} prospectos={prospectos}/>}
       </div>
