@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 const CONFIG = {
   SHEET_ID: "1TZrxxRsaPRs6vUm9YnLLO_KjYDdCUJ6L2Vahhs9Y5GM",
   API_KEY: "AIzaSyDtSmr2Z_konxk5HjhCUH4A1_K0Md1ebZ4",
-  MAPS_KEY: "AIzaSyDtSmr2Z_konxk5HjhCUH4A1_K0Md1ebZ4",
+  MAPS_KEY: import.meta.env.VITE_MAPS_KEY || "",
   MAKE_WEBHOOK_E5: "https://hook.us2.make.com/jyfj767nmqfnpj7uk8srlyvudficta7x",
   MAKE_WEBHOOK_RESULT: "https://hook.eu1.make.com/YOUR_RESULTADO_URL",
   MAKE_WEBHOOK_E7: "https://hook.us2.make.com/aodn54hswhl3cyvynkto3f5hbhwaftna",
@@ -452,32 +452,49 @@ function MapaDelDia({prospectos,onSelect,onToast,addNotif}){
         }
       </div>
 
-      {/* Mapa Google Maps */}
-      <div style={{margin:"8px 16px",borderRadius:16,overflow:"hidden",border:"1.5px solid #E2E8F0",position:"relative",height:220}}>
-        {CONFIG.MAPS_KEY ? (
-          <iframe
-            title="Mapa citas"
-            width="100%"
-            height="220"
-            style={{border:0,display:"block"}}
-            loading="lazy"
-            allowFullScreen
-            src={`https://www.google.com/maps/embed/v1/search?key=${CONFIG.MAPS_KEY}&q=${encodeURIComponent(citasMostrar.map(c=>c.direccion).filter(Boolean).join("|")||"Ciudad de México")}&zoom=12`}
-          />
-        ) : (
-          <div style={{height:220,background:"linear-gradient(135deg,#E8F5E9,#E3F2FD)",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:8,color:"#64748B"}}>
-            <div style={{fontSize:28}}>🗺️</div>
-            <div style={{fontSize:13,fontWeight:600}}>Configura VITE_MAPS_KEY en Vercel</div>
+      {/* Mapa — links a Google Maps */}
+      <div style={{margin:"8px 16px",borderRadius:16,overflow:"hidden",border:"1.5px solid #E2E8F0"}}>
+        {citasMostrar.length>0 ? (
+          <div>
+            {/* Static map image via Google Static Maps */}
+            {CONFIG.MAPS_KEY ? (
+              <img
+                src={`https://maps.googleapis.com/maps/api/staticmap?size=400x200&maptype=roadmap&${citasMostrar.map((c,i)=>`markers=color:green%7Clabel:${i+1}%7C${encodeURIComponent(c.direccion||"Ciudad de México")}`).join("&")}&key=${CONFIG.MAPS_KEY}`}
+                alt="Mapa de citas"
+                style={{width:"100%",height:180,objectFit:"cover",display:"block"}}
+                onError={e=>{e.target.style.display="none";}}
+              />
+            ):(
+              <div style={{height:120,background:"linear-gradient(135deg,#0F172A,#1E293B)",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+                <span style={{fontSize:24}}>🗺️</span>
+                <span style={{fontSize:13,color:"#64748B"}}>Mapa de citas del día</span>
+              </div>
+            )}
+            {/* Citas como lista de botones que abren Maps */}
+            <div style={{padding:"8px 12px",display:"flex",flexDirection:"column",gap:6}}>
+              {citasMostrar.map((c,i)=>(
+                <button key={c.id}
+                  onClick={()=>window.open(`https://maps.google.com/?q=${encodeURIComponent(c.direccion||c.nombre)}`,"_blank")}
+                  style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:"#F8FAFC",border:"1.5px solid #E2E8F0",borderRadius:10,cursor:"pointer",textAlign:"left",width:"100%"}}>
+                  <span style={{width:22,height:22,background:"#10B981",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,color:"white",flexShrink:0}}>{i+1}</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:700,color:"#0F172A",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.nombre}</div>
+                    <div style={{fontSize:11,color:"#64748B",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>📍 {c.direccion?.split(",").slice(0,2).join(",")}</div>
+                  </div>
+                  <div style={{textAlign:"right",flexShrink:0}}>
+                    <div style={{fontSize:16,fontWeight:800,color:"#0EA5E9"}}>{c.horaCita||"—"}</div>
+                    <div style={{fontSize:10,color:"#10B981",fontWeight:600}}>Abrir →</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        ):(
+          <div style={{height:120,background:"linear-gradient(135deg,#F8FAFC,#EFF6FF)",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:6,color:"#94A3B8"}}>
+            <span style={{fontSize:28}}>📅</span>
+            <span style={{fontSize:13}}>No hay citas {vistaFecha==="hoy"?"hoy":"esta semana"}</span>
           </div>
         )}
-        {/* Citas overlay */}
-        <div style={{position:"absolute",bottom:8,left:8,right:8,display:"flex",gap:6,overflowX:"auto"}}>
-          {citasMostrar.map(c=>(
-            <div key={c.id} style={{flexShrink:0,background:"white",borderRadius:8,padding:"4px 8px",fontSize:11,fontWeight:700,color:"#0EA5E9",boxShadow:"0 2px 8px rgba(0,0,0,0.15)",whiteSpace:"nowrap"}}>
-              🕐 {c.horaCita||"?"} · {c.nombre?.split(" ").slice(0,2).join(" ")}
-            </div>
-          ))}
-        </div>
       </div>
 
       {/* Llamar por zona */}
