@@ -235,7 +235,6 @@ function ProspectoModal({p,onClose,onUpdate,onToast,plan,addNotif}){
           objecion:form.objecion,
           vendedor:CONFIG_USER.name,
           id_vendedor:CONFIG_USER.id,
-          pin:session.pin,
         })
       });
       onToast("✅ Visita guardada en Sheet","success");
@@ -624,7 +623,7 @@ function Checklist({prospectos,onSelect,onUpdate,onToast,vendorId}){
   onUpdate(p.id,{seguimiento:true});
   try{
     await fetch(CONFIG.MAKE_WEBHOOK_E7,{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({accion:"completar_seguimiento",id_prospecto:p.id,id_vendedor:CONFIG_USER.id,pin:session.pin})});
+      body:JSON.stringify({accion:"completar_seguimiento",id_prospecto:p.id,id_vendedor:CONFIG_USER.id})});
     onToast("✅ Completado y guardado","success");
   }catch(e){onToast("✅ Completado","success");}
 }} style={{flex:1,padding:"8px 0",background:"#EFF6FF",color:"#0EA5E9",border:"1.5px solid #BAE6FD",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer"}}>✅ Hecho</button>
@@ -714,7 +713,7 @@ function PlanSemanal({prospectos,onToast}){
                 body:JSON.stringify({accion:"plan_semanal",semana:active,id_vendedor:CONFIG_USER.id,
                   lunes:plan[active]?.LUNES||"",martes:plan[active]?.MARTES||"",
                   miercoles:plan[active]?.MIÉRCOLES||"",jueves:plan[active]?.JUEVES||"",
-                  viernes:plan[active]?.VIERNES||"",pin:session.pin})
+                  viernes:plan[active]?.VIERNES||""})
               });
               onToast("💾 Plan guardado en Sheet","success");
             }catch(e){onToast("💾 Plan guardado","success");}
@@ -748,7 +747,7 @@ function NuevaClinica({onToast,addNotif,prospectos}){
           wa_opt_in:form.waOptIn,tipo_accion:form.tipoAccion,
           proxima_accion:form.proximaAccion,clinica_digital:form.clinicaDigital,
           objecion:form.objecion,vendedor:CONFIG_USER.name,
-          id_vendedor:CONFIG_USER.id,pin:session.pin,
+          id_vendedor:CONFIG_USER.id,
         })
       });
       onToast("✅ Clínica guardada en Sheet","success");
@@ -943,7 +942,6 @@ function LoginScreen({onLogin}){
         id_vendedor: vendedor[0],
         nombre: vendedor[1],
         email: vendedor[3]||"",
-        pin: pin,
       };
       sessionStorage.setItem("ag_session", JSON.stringify(session));
       onLogin(session);
