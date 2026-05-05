@@ -935,8 +935,10 @@ function LoginScreen({onLogin}){
       if(!vendedor){setError("ID "+idVendedor+" no encontrado en el Sheet");setLoading(false);return;}
       
       const pinCorrecto = vendedor[10]; // col K = PIN
-      console.log("PIN esperado:", pinCorrecto, "PIN ingresado:", pin);
-      if(pin!==String(pinCorrecto)){setError("PIN incorrecto. Esperado: "+pinCorrecto);setLoading(false);return;}
+      // Handle float PINs from Sheet (e.g. "2030.0" → "2030")
+      const pinLimpio = String(pinCorrecto).replace(".0","").trim();
+      console.log("PIN esperado:", pinLimpio, "PIN ingresado:", pin);
+      if(pin!==pinLimpio){setError("PIN incorrecto");setLoading(false);return;}
       
       const session = {
         id_vendedor: vendedor[0],
