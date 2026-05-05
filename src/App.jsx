@@ -345,7 +345,7 @@ function ProspectoModal({p,onClose,onUpdate,onToast,plan,addNotif}){
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",background:"#F0FDF4",borderRadius:10}}>
                   <input type="checkbox" id="wa" checked={form.waOptIn} onChange={e=>setForm(f=>({...f,waOptIn:e.target.checked}))} style={{width:18,height:18,cursor:"pointer"}}/>
-                  <label htmlFor="wa" style={{fontSize:13,color:"#065F46",fontWeight:600,cursor:"pointer"}}>✅ Aceptó recibir WhatsApp</label>
+                  <label htmlFor="wa" style={{fontSize:13,color:form.waOptIn?"#065F46":"#64748B",fontWeight:600,cursor:"pointer"}}>{form.waOptIn?"✅ Aceptó recibir WhatsApp":"⬜ ¿Acepta recibir WhatsApp?"}</label>
                 </div>
                 <button onClick={save} style={{width:"100%",padding:"14px",background:"linear-gradient(135deg,#0EA5E9,#8B5CF6)",color:"white",border:"none",borderRadius:12,fontSize:15,fontWeight:700,cursor:"pointer"}}>Guardar Visita</button>
               </div>
@@ -857,7 +857,7 @@ function NuevaClinica({onToast,addNotif,prospectos}){
           </div>
           <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:"#F0FDF4",borderRadius:10}}>
             <input type="checkbox" id="waNew" checked={form.waOptIn} onChange={e=>setForm(f=>({...f,waOptIn:e.target.checked}))} style={{width:16,height:16,cursor:"pointer"}}/>
-            <label htmlFor="waNew" style={{fontSize:12,color:"#065F46",fontWeight:600,cursor:"pointer"}}>✅ Aceptó recibir WhatsApp</label>
+            <label htmlFor="waNew" style={{fontSize:12,color:form.waOptIn?"#065F46":"#64748B",fontWeight:600,cursor:"pointer"}}>{form.waOptIn?"✅ Aceptó recibir WhatsApp":"⬜ ¿Acepta recibir WhatsApp?"}</label>
           </div>
         </div>
       )}
