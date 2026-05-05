@@ -923,7 +923,7 @@ function LoginScreen({onLogin}){
       // Verify PIN against Vendedores sheet
       const sheetId = CONFIG.SHEET_ID;
       const apiKey = CONFIG.API_KEY;
-      const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent("👥 Vendedores!A2:K20")}?key=${apiKey}`;
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent("Vendedores!A2:K20")}?key=${apiKey}`;
       console.log("Fetching vendedores:", url);
       const res = await fetch(url);
       const data = await res.json();
@@ -1026,7 +1026,7 @@ function AppMain({session,onLogout}){
     }
     setLoadingSheet(true);
     // Fetch from row 7 onwards (headers in row 6)
-    const range = "📋 Prospectos!A2:AQ";
+    const range = "Prospectos!A2:AQ";
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(range)}?key=${apiKey}`;
     fetch(url)
       .then(r=>r.json())
@@ -1084,7 +1084,7 @@ function AppMain({session,onLogout}){
     const sheetId=CONFIG.SHEET_ID;
     const apiKey=CONFIG.API_KEY;
     if(sheetId==="YOUR_GOOGLE_SHEET_ID") return;
-    const url=`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent("👥 Vendedores!A2:K20")}?key=${apiKey}`;
+    const url=`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent("Vendedores!A2:K20")}?key=${apiKey}`;
     fetch(url).then(r=>r.json()).then(data=>{
       if(!data.values) return;
       const vend=data.values.find(r=>r[0]===CONFIG_USER.id);
