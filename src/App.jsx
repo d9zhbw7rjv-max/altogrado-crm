@@ -1077,6 +1077,31 @@ function AppMain({session,onLogout}){
       });
   },[]);
 
+  const [sistemaActivo,setSistemaActivo]=useState(true);
+
+  // Load sistema status from sheet on mount
+  useEffect(()=>{
+    const sheetId=CONFIG.SHEET_ID;
+    const apiKey=CONFIG.API_KEY;
+    if(sheetId==="YOUR_GOOGLE_SHEET_ID") return;
+    const url=`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent("👥 Vendedores!A2:K20")}?key=${apiKey}`;
+    fetch(url).then(r=>r.json()).then(data=>{
+      if(!data.values) return;
+      const vend=data.values.find(r=>r[0]===CONFIG_USER.id);
+      if(vend) setSistemaActivo(vend[9]==="TRUE"||vend[9]===true||vend[9]==="true");
+    }).catch(()=>{});
+  },[]);
+
+  const toggleSistema=async()=>{
+    const nuevoEstado=!sistemaActivo;
+    setSistemaActivo(nuevoEstado);
+    try{
+      await fetch(CONFIG.MAKE_WEBHOOK_E7,{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({accion:"pausar_sistema",id_vendedor:CONFIG_USER.id,activo:nuevoEstado})});
+      showToast(nuevoEstado?"✅ Sistema de llamadas activado":"⏸️ Sistema pausado",nuevoEstado?"success":"warning");
+    }catch(e){showToast("Error al actualizar","error");}
+  };
+
   const unread=notifs.filter(n=>!n.read).length;
   const citasHoy=prospectos.filter(p=>p.estado==="CITA_AGENDADA"&&p.fechaCita===fmt(today)).length;
   const checkCount=prospectos.filter(p=>p.estado==="VISITADO_INTERESADO"&&!p.seguimiento&&p.vendedor===CONFIG_USER.id).length;
@@ -1120,7 +1145,12 @@ function AppMain({session,onLogout}){
             <span style={{fontSize:22}}>🔔</span>
             {unread>0&&<span style={{position:"absolute",top:0,right:0,background:"#EF4444",color:"white",borderRadius:10,fontSize:9,fontWeight:700,padding:"1px 5px",minWidth:14,textAlign:"center"}}>{unread}</span>}
           </button>
-          <Avatar name={CONFIG_USER.name} size={34}/>
+          <button onClick={toggleSistema} title={sistemaActivo?"Pausar sistema":"Activar sistema"} style={{background:sistemaActivo?"#10B981":"#EF4444",border:"none",borderRadius:20,padding:"4px 10px",cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
+            <span style={{fontSize:10,fontWeight:700,color:"white"}}>{sistemaActivo?"🤖 ON":"⏸️ OFF"}</span>
+          </button>
+          <button onClick={onLogout} title="Cerrar sesión" style={{background:"none",border:"none",cursor:"pointer",padding:4}}>
+            <Avatar name={CONFIG_USER.name} size={34}/>
+          </button>
         </div>
       </div>
 
