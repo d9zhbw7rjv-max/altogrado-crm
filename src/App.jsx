@@ -269,7 +269,7 @@ function ProspectoModal({p,onClose,onUpdate,onToast,plan,addNotif}){
             </div>
             <div style={{display:"flex",gap:8,paddingBottom:16}}>
               <button onClick={()=>setShowCall(true)} style={{flex:1,padding:"10px 0",background:"#EFF6FF",color:"#0EA5E9",border:"1.5px solid #BAE6FD",borderRadius:10,fontSize:13,fontWeight:600,cursor:"pointer"}}>📞 Llamar</button>
-              <button onClick={()=>{const n=(p.waNumero||p.telefono).replace("+","");window.open(`https://wa.me/${n}`,"_blank");}} style={{flex:1,padding:"10px 0",background:"#F0FDF4",color:"#10B981",border:"1.5px solid #A7F3D0",borderRadius:10,fontSize:13,fontWeight:600,cursor:"pointer"}}>💬 WA</button>
+              <button onClick={()=>{const waNum=p.waNumero&&p.waNumero.trim()!==""?p.waNumero:"";if(!waNum){alert("Sin número WhatsApp. Captura en Registrar → Número WhatsApp.");return;}window.open(`https://wa.me/${waNum.replace("+","")}`, "_blank");}} style={{flex:1,padding:"10px 0",background:"#F0FDF4",color:"#10B981",border:"1.5px solid #A7F3D0",borderRadius:10,fontSize:13,fontWeight:600,cursor:"pointer"}}>💬 WA</button>
               <button onClick={()=>window.open(`https://maps.google.com/?q=${encodeURIComponent(p.direccion)}`,"_blank")} style={{flex:1,padding:"10px 0",background:"#F5F3FF",color:"#8B5CF6",border:"1.5px solid #DDD6FE",borderRadius:10,fontSize:13,fontWeight:600,cursor:"pointer"}}>🗺️ Maps</button>
             </div>
             <div style={{display:"flex"}}>
@@ -337,6 +337,9 @@ function ProspectoModal({p,onClose,onUpdate,onToast,plan,addNotif}){
 
                 <div><label style={lbl}>Nombre del doctor</label>
                   <input value={form.nombreDoctor} onChange={e=>setForm(f=>({...f,nombreDoctor:e.target.value}))} placeholder="Dr. ..." style={inp}/>
+                </div>
+                <div><label style={lbl}>Número WhatsApp</label>
+                  <input value={form.waNumero||""} onChange={e=>setForm(f=>({...f,waNumero:e.target.value}))} placeholder="+52 55 XXXX XXXX" style={inp}/>
                 </div>
                 <div><label style={lbl}>Lab con el que trabajan hoy</label>
                   <input value={form.labActual} onChange={e=>setForm(f=>({...f,labActual:e.target.value}))} placeholder="Nombre del laboratorio..." style={inp}/>
@@ -1056,7 +1059,7 @@ function AppMain({session,onLogout}){
           // Also map as 'vendedor' for compatibility with filters
           id_vendedor:  row[22]||"",
           waOptIn:      row[23]==="TRUE"||row[23]===true,
-          waNumero:     row[24]||"",
+          waNumero:     row[24]||"",  // col Y = WA NÚMERO real
           labActual:    row[25]||"",
           especialidad: row[29]||"",
           fechaVisita:  row[30]||"",
