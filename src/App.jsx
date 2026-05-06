@@ -200,6 +200,7 @@ function ProspectoModal({p,onClose,onUpdate,onToast,plan,addNotif}){
     objecion:p.objecion||"",
     clinicaDigital:p.clinicaDigital||"",
     waOptIn:p.waOptIn||false,
+    waNumero:p.waNumero||"",
     tipoAccion:p.tipoAccion||"",
     proximaAccion:p.proximaAccion||"",
     nombreDoctor:p.doctor||"",
@@ -838,6 +839,9 @@ function NuevaClinica({onToast,addNotif,prospectos}){
 
           <div><label style={lbl}>Nombre del doctor</label>
             <input value={form.doctor} onChange={e=>setForm(f=>({...f,doctor:e.target.value}))} placeholder="Dr. ..." style={inp}/>
+          </div>
+          <div><label style={lbl}>Número WhatsApp</label>
+            <input value={form.waNumero||""} onChange={e=>setForm(f=>({...f,waNumero:e.target.value}))} placeholder="+52 55 XXXX XXXX" style={inp}/>
           </div>
           <div><label style={lbl}>Lab con el que trabajan</label>
             <input value={form.labActual} onChange={e=>setForm(f=>({...f,labActual:e.target.value}))} placeholder="Nombre del laboratorio..." style={inp}/>
