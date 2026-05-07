@@ -791,7 +791,7 @@ function NuevaClinica({onToast,addNotif,prospectos}){
       await fetch(CONFIG.MAKE_WEBHOOK_E7,{method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({
           accion:"nueva_clinica",
-          nombre:form.nombre,telefono:form.telefono,
+          nombre:form.nombre,telefono:String(form.telefono||"").replace(".0",""),
           direccion:form.direccion,zona:form.zona,
           notas:form.notas,doctor:form.doctor,
           lab_actual:form.labActual,resultado_visita:form.resultadoVisita,
@@ -1092,7 +1092,7 @@ function AppMain({session,onLogout}){
           id:           row[0]||"",
           nombre:       row[1]||"",
           doctor:       row[2]||"",
-          telefono:     row[3]||"",
+          telefono:     String(row[3]||"").replace(".0",""),
           email:        row[5]||"",
           direccion:    row[6]||"",
           zona:         row[13]||"",
@@ -1106,7 +1106,7 @@ function AppMain({session,onLogout}){
           // Also map as 'vendedor' for compatibility with filters
           id_vendedor:  row[22]||"",
           waOptIn:      row[23]==="TRUE"||row[23]===true,
-          waNumero:     row[24]||"",  // col Y = WA NÚMERO real
+          waNumero:     String(row[24]||"").replace(".0",""),  // col Y = WA NÚMERO real
           labActual:    row[25]||"",
           especialidad: row[29]||"",
           fechaVisita:  row[30]||"",
