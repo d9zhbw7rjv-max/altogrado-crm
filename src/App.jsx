@@ -4,7 +4,7 @@ const CONFIG = {
   SHEET_ID: "1zjE1N808vj4tLl6cwD3fSbxGS3bVkCWe-wqJXMKA4zk",
   API_KEY: "AIzaSyDtSmr2Z_konxk5HjhCUH4A1_K0Md1ebZ4",
   MAPS_KEY: import.meta.env.VITE_MAPS_KEY || "",
-  MAKE_WEBHOOK_E5: "https://hook.eu1.make.com/YOUR_ESCENARIO5_URL",
+  MAKE_WEBHOOK_E5: "https://hook.us2.make.com/jyfj767nmqfnpj7uk8srlyvudficta7x",
   MAKE_WEBHOOK_RESULT: "https://hook.eu1.make.com/YOUR_RESULTADO_URL",
   MAKE_WEBHOOK_E7: "https://hook.us2.make.com/aodn54hswhl3cyvynkto3f5hbhwaftna",
 };
@@ -1087,7 +1087,7 @@ function AppMain({session,onLogout}){
 
   // Generate dynamic notifications from prospectos
   useEffect(()=>{
-    if(!prospectos||prospectos===MOCK) return;
+    if(!prospectos||prospectos.length===0||prospectos[0]?.id==="PRO-0002") return;
     const today=new Date().toISOString().split("T")[0];
     const generated=[];
     prospectos.forEach(p=>{
