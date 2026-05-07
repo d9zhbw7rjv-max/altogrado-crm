@@ -66,6 +66,20 @@ const W0 = getWeekKey(today);
 const W1 = getWeekKey(addDays(today,7));
 const W2 = getWeekKey(addDays(today,14));
 
+
+// Normalize phone to 52XXXXXXXXXX format (no + sign)
+function normalizeTel(tel) {
+  if (!tel) return "";
+  let s = String(tel).replace(".0","").replace(/\s/g,"").replace("+","");
+  // Remove duplicate 52 prefix
+  if (s.startsWith("5252")) s = s.slice(2);
+  // If 10 digits, add 52
+  if (s.length === 10) s = "52" + s;
+  // If 11 digits starting with 1, replace with 52
+  if (s.length === 11 && s.startsWith("1")) s = "52" + s.slice(1);
+  return s;
+}
+
 const MOCK = [
   {id:"PRO-0002",nombre:"Dentistakids",doctor:"",telefono:"+525562036910",email:"dentistakidscontacto@gmail.com",direccion:"C. Gobernador Ignacio Esteva 19B, San Miguel Chapultepec, CDMX",zona:"SAN MIGUEL CHAPULTEPEC",estado:"NUEVO",score:563,intentos:0,notas:"",vendedor:"VEND-001",seguimiento:false,tipoAccion:"",proximaAccion:"",labActual:"",resultadoVisita:"",waOptIn:false,waNumero:"",fechaCita:"",horaCita:"",objecion:"",clinicaDigital:""},
   {id:"PRO-0003",nombre:"Fundación Mil Sonrisas",doctor:"Dr. García",telefono:"+525598765432",email:"",direccion:"Av. Juárez 15, Centro Histórico, CDMX",zona:"CUAUHTEMOC",estado:"VISITADO_INTERESADO",score:485,intentos:1,notas:"Muy interesado, 3 sillones",vendedor:"VEND-001",seguimiento:true,tipoAccion:"WHATSAPP",proximaAccion:fmt(addDays(today,1)),labActual:"Lab Express",resultadoVisita:"INTERESADO",waOptIn:true,waNumero:"+525598765432",fechaCita:"",horaCita:"",objecion:"PRECIO",clinicaDigital:"DIGITAL"},
@@ -378,14 +392,14 @@ function ProspectoModal({p,onClose,onUpdate,onToast,plan,addNotif}){
       </div>
 
       {showCall&&<CallModal prospecto={p} plan={INIT_PLAN[W0]} onClose={()=>setShowCall(false)}
-        onCallDirect={()=>window.open(`tel:${p.telefono}`,"_self")}
+        onCallDirect={()=>{const t=normalizeTel(p.telefono);const local=t.startsWith("52")?t.slice(2):t;window.open(`tel:${local}`,"_self");}}
         onCallSystem={async(mode,enZona)=>{
           onToast(enZona?"🤖 Ana ofrece visita inmediata...":"🤖 Ana está llamando...","info");
           try {
             await fetch(CONFIG.MAKE_WEBHOOK_E5,{
               method:"POST",
               headers:{"Content-Type":"application/json"},
-              body:JSON.stringify({zona:p.zona,id_vendedor:CONFIG_USER.id,max_llamadas:1,vendedora_en_zona:enZona})
+              body:JSON.stringify({zona:p.zona,id_vendedor:CONFIG_USER.id,max_llamadas:1,vendedora_en_zona:enZona,id_prospecto:p.id,telefono:normalizeTel(p.telefono)})
             });
             addNotif({id:Date.now(),icon:"🤖",title:"Ana llamó a "+p.nombre,body:enZona?"Ana ofreció que puedes pasar hoy mismo.":"Ana intentará agendar cita.",time:"Ahora mismo",read:false});
           } catch(e){
@@ -791,7 +805,7 @@ function NuevaClinica({onToast,addNotif,prospectos}){
       await fetch(CONFIG.MAKE_WEBHOOK_E7,{method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({
           accion:"nueva_clinica",
-          nombre:form.nombre,telefono:String(form.telefono||"").replace(".0",""),
+          nombre:form.nombre,telefono:normalizeTel(form.telefono),
           direccion:form.direccion,zona:form.zona,
           notas:form.notas,doctor:form.doctor,
           lab_actual:form.labActual,resultado_visita:form.resultadoVisita,
@@ -1092,7 +1106,7 @@ function AppMain({session,onLogout}){
           id:           row[0]||"",
           nombre:       row[1]||"",
           doctor:       row[2]||"",
-          telefono:     String(row[3]||"").replace(".0",""),
+          telefono:     normalizeTel(row[3]),
           email:        row[5]||"",
           direccion:    row[6]||"",
           zona:         row[13]||"",
@@ -1106,7 +1120,7 @@ function AppMain({session,onLogout}){
           // Also map as 'vendedor' for compatibility with filters
           id_vendedor:  row[22]||"",
           waOptIn:      row[23]==="TRUE"||row[23]===true,
-          waNumero:     String(row[24]||"").replace(".0",""),  // col Y = WA NÚMERO real
+          waNumero:     normalizeTel(row[24]),  // col Y = WA NÚMERO real
           labActual:    row[25]||"",
           especialidad: row[29]||"",
           fechaVisita:  row[30]||"",
