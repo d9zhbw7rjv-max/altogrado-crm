@@ -1084,31 +1084,6 @@ function AppMain({session,onLogout}){
   const [toast,setToast]=useState(null);
   const [showNotif,setShowNotif]=useState(false);
   const [notifs,setNotifs]=useState([]);
-
-  // Generate dynamic notifications from prospectos
-  useEffect(()=>{
-    if(!prospectos||prospectos.length===0||prospectos[0]?.id==="PRO-0002") return;
-    const today=new Date().toISOString().split("T")[0];
-    const generated=[];
-    prospectos.forEach(p=>{
-      if(p.vendedor_id!==CONFIG_USER.id&&p.id_vendedor!==CONFIG_USER.id&&p.vendedor!==CONFIG_USER.id) return;
-      // New citas agendadas
-      if(p.estado==="CITA_AGENDADA"&&p.fechaCita){
-        generated.push({id:`cita-${p.id}`,icon:"📅",title:`Cita agendada — ${p.nombre}`,body:`${p.fechaCita}${p.horaCita?" a las "+p.horaCita:""}`,time:p.fechaCita,read:p.fechaCita<today});
-      }
-      // Callbacks pendientes para hoy
-      if(p.estado==="CALLBACK_SOLICITADO"&&p.proximaAccion===today){
-        generated.push({id:`cb-${p.id}`,icon:"📞",title:`Callback pendiente — ${p.nombre}`,body:`El doctor pidió que lo llames hoy`,time:today,read:false});
-      }
-      // Seguimientos vencidos
-      if(p.estado==="VISITADO_INTERESADO"&&!p.seguimiento&&p.proximaAccion&&p.proximaAccion<=today){
-        generated.push({id:`seg-${p.id}`,icon:"✅",title:`Seguimiento pendiente — ${p.nombre}`,body:`Acción: ${p.tipoAccion||"LLAMADA"} · ${p.proximaAccion}`,time:p.proximaAccion,read:p.proximaAccion<today});
-      }
-    });
-    // Sort by date desc
-    generated.sort((a,b)=>b.time.localeCompare(a.time));
-    setNotifs(generated.slice(0,20));
-  },[prospectos]);
   const [prospectos,setProspectos]=useState(MOCK);
   const [loadingSheet,setLoadingSheet]=useState(false);
   const [sheetError,setSheetError]=useState(null);
