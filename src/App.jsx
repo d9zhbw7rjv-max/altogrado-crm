@@ -4,7 +4,7 @@ const CONFIG = {
   SHEET_ID: "1zjE1N808vj4tLl6cwD3fSbxGS3bVkCWe-wqJXMKA4zk",
   API_KEY: "AIzaSyDtSmr2Z_konxk5HjhCUH4A1_K0Md1ebZ4",
   MAPS_KEY: import.meta.env.VITE_MAPS_KEY || "",
-  MAKE_WEBHOOK_E5: "https://hook.us2.make.com/jyfj767nmqfnpj7uk8srlyvudficta7x",
+  MAKE_WEBHOOK_E5: "https://hook.eu1.make.com/YOUR_ESCENARIO5_URL",
   MAKE_WEBHOOK_RESULT: "https://hook.eu1.make.com/YOUR_RESULTADO_URL",
   MAKE_WEBHOOK_E7: "https://hook.us2.make.com/aodn54hswhl3cyvynkto3f5hbhwaftna",
 };
@@ -1083,10 +1083,32 @@ function AppMain({session,onLogout}){
   const [selected,setSelected]=useState(null);
   const [toast,setToast]=useState(null);
   const [showNotif,setShowNotif]=useState(false);
-  const [notifs,setNotifs]=useState([
-    {id:1,icon:"🤖",title:"Ana agendó cita en La Clínica Dental Roma",body:"Jueves 10am confirmado — Condesa y Roma",time:"Hace 5 min",read:false},
-    {id:2,icon:"📅",title:"Plan semanal sincronizado",body:"Make actualizó los slots del calendario.",time:"Hace 1h",read:true},
-  ]);
+  const [notifs,setNotifs]=useState([]);
+
+  // Generate dynamic notifications from prospectos
+  useEffect(()=>{
+    if(!prospectos||prospectos===MOCK) return;
+    const today=new Date().toISOString().split("T")[0];
+    const generated=[];
+    prospectos.forEach(p=>{
+      if(p.vendedor_id!==CONFIG_USER.id&&p.id_vendedor!==CONFIG_USER.id&&p.vendedor!==CONFIG_USER.id) return;
+      // New citas agendadas
+      if(p.estado==="CITA_AGENDADA"&&p.fechaCita){
+        generated.push({id:`cita-${p.id}`,icon:"📅",title:`Cita agendada — ${p.nombre}`,body:`${p.fechaCita}${p.horaCita?" a las "+p.horaCita:""}`,time:p.fechaCita,read:p.fechaCita<today});
+      }
+      // Callbacks pendientes para hoy
+      if(p.estado==="CALLBACK_SOLICITADO"&&p.proximaAccion===today){
+        generated.push({id:`cb-${p.id}`,icon:"📞",title:`Callback pendiente — ${p.nombre}`,body:`El doctor pidió que lo llames hoy`,time:today,read:false});
+      }
+      // Seguimientos vencidos
+      if(p.estado==="VISITADO_INTERESADO"&&!p.seguimiento&&p.proximaAccion&&p.proximaAccion<=today){
+        generated.push({id:`seg-${p.id}`,icon:"✅",title:`Seguimiento pendiente — ${p.nombre}`,body:`Acción: ${p.tipoAccion||"LLAMADA"} · ${p.proximaAccion}`,time:p.proximaAccion,read:p.proximaAccion<today});
+      }
+    });
+    // Sort by date desc
+    generated.sort((a,b)=>b.time.localeCompare(a.time));
+    setNotifs(generated.slice(0,20));
+  },[prospectos]);
   const [prospectos,setProspectos]=useState(MOCK);
   const [loadingSheet,setLoadingSheet]=useState(false);
   const [sheetError,setSheetError]=useState(null);
@@ -1138,7 +1160,7 @@ function AppMain({session,onLogout}){
           objecion:     "",
           clinicaDigital:"",
           fechaCita:    row[32]||"",
-          horaCita:     "",
+          horaCita:     row[33]||"",
         })).filter(r=>r.id&&r.nombre);
         setProspectos(rows);
         setLoadingSheet(false);
@@ -1219,11 +1241,11 @@ function AppMain({session,onLogout}){
             <span style={{fontSize:22}}>🔔</span>
             {unread>0&&<span style={{position:"absolute",top:0,right:0,background:"#EF4444",color:"white",borderRadius:10,fontSize:9,fontWeight:700,padding:"1px 5px",minWidth:14,textAlign:"center"}}>{unread}</span>}
           </button>
-          <button onClick={toggleSistema} title={sistemaActivo?"Pausar sistema":"Activar sistema"} style={{background:sistemaActivo?"#10B981":"#EF4444",border:"none",borderRadius:20,padding:"4px 10px",cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
-            <span style={{fontSize:10,fontWeight:700,color:"white"}}>{sistemaActivo?"🤖 ON":"⏸️ OFF"}</span>
-          </button>
           <button onClick={onLogout} title="Cerrar sesión" style={{background:"none",border:"none",cursor:"pointer",padding:4}}>
             <Avatar name={CONFIG_USER.name} size={34}/>
+          </button>
+          <button onClick={toggleSistema} title={sistemaActivo?"Pausar sistema":"Activar sistema"} style={{background:sistemaActivo?"#10B981":"#EF4444",border:"none",borderRadius:20,padding:"4px 10px",cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
+            <span style={{fontSize:10,fontWeight:700,color:"white"}}>{sistemaActivo?"🤖 ON":"⏸️ OFF"}</span>
           </button>
         </div>
       </div>
