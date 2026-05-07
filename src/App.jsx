@@ -646,6 +646,34 @@ function PlanSemanal({prospectos,onToast}){
   const WEEKS=[{key:W0,label:"Esta semana",short:"W0"},{key:W1,label:"Próx. semana",short:"W1"},{key:W2,label:"En 2 semanas",short:"W2"}];
   const [active,setActive]=useState(W1);
   const [plan,setPlan]=useState(INIT_PLAN);
+
+  // Load Plan Semanal from Sheet
+  useEffect(()=>{
+    const sheetId=CONFIG.SHEET_ID;
+    const apiKey=CONFIG.API_KEY;
+    if(sheetId==="YOUR_GOOGLE_SHEET_ID") return;
+    const range="Plan Semanal!A2:R50";
+    const url=`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(range)}?key=${apiKey}`;
+    fetch(url).then(r=>r.json()).then(data=>{
+      if(!data.values) return;
+      const planData={...INIT_PLAN};
+      data.values.forEach(row=>{
+        const planKey=row[17]||""; // col R = PLAN_KEY
+        const semana=row[1]||"";   // col B = SEMANA
+        if(!planKey||![W0,W1,W2].includes(semana)) return;
+        planData[semana]={
+          semana,
+          LUNES:      row[4]||"",  // col E
+          MARTES:     row[5]||"",  // col F
+          MIÉRCOLES:  row[6]||"",  // col G
+          JUEVES:     row[7]||"",  // col H
+          VIERNES:    row[8]||"",  // col I
+          locked:     semana===W0,
+        };
+      });
+      setPlan(planData);
+    }).catch(()=>{});
+  },[]);
   const DIAS=["LUNES","MARTES","MIÉRCOLES","JUEVES","VIERNES"];
   const getCount=zona=>prospectos.filter(p=>p.zona===zona&&p.estado!=="CLIENTE_ACTIVO"&&p.estado!=="DESCARTADO").length;
   const getCitas=zona=>prospectos.filter(p=>p.zona===zona&&p.estado==="CITA_AGENDADA").length;
@@ -720,6 +748,24 @@ function PlanSemanal({prospectos,onToast}){
                   viernes:plan[active]?.VIERNES||""})
               });
               onToast("💾 Plan guardado en Sheet","success");
+              // Reload plan from sheet
+              const range="Plan Semanal!A2:R50";
+              const url=`https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SHEET_ID}/values/${encodeURIComponent(range)}?key=${CONFIG.API_KEY}`;
+              fetch(url).then(r=>r.json()).then(data=>{
+                if(!data.values) return;
+                const planData={...plan};
+                data.values.forEach(row=>{
+                  const semana=row[1]||"";
+                  if(![W0,W1,W2].includes(semana)) return;
+                  planData[semana]={
+                    semana,
+                    LUNES:row[4]||"",MARTES:row[5]||"",
+                    MIÉRCOLES:row[6]||"",JUEVES:row[7]||"",
+                    VIERNES:row[8]||"",locked:semana===W0,
+                  };
+                });
+                setPlan(planData);
+              }).catch(()=>{});
             }catch(e){onToast("💾 Plan guardado","success");}
           }}>
             💾 Guardar Plan
