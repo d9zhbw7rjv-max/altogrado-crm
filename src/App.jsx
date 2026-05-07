@@ -557,11 +557,14 @@ function MapaDelDia({prospectos,onSelect,onToast,addNotif}){
 function ListaDelDia({prospectos,onSelect,vendorId}){
   const [search,setSearch]=useState("");
   const [filter,setFilter]=useState("TODOS");
-  const QUICK=["TODOS","NUEVO","CITA_AGENDADA","VISITADO_INTERESADO","LLAMADA_PENDIENTE"];
+  const QUICK=["TODOS","NUEVO","CITA_AGENDADA","VISITADO_INTERESADO","LLAMADA_PENDIENTE","DAR_SEGUIMIENTO","PRIMER_PEDIDO","CLIENTE_ACTIVO"];
+
+  const DAR_SEGUIMIENTO_ESTADOS=["CALLBACK_SOLICITADO","EN_ZONA","VISITADO_INTERESADO","TRANSFERIDO_TECNICO"];
+
   const filtered=prospectos
-    .filter(p=>p.estado!=="CLIENTE_ACTIVO"&&p.estado!=="DESCARTADO"&&(vendorId?p.vendedor_id===vendorId||p.id_vendedor===vendorId:true))
+    .filter(p=>p.estado!=="DESCARTADO"&&(vendorId?p.vendedor_id===vendorId||p.id_vendedor===vendorId:true))
     .filter(p=>!search||p.nombre.toLowerCase().includes(search.toLowerCase())||p.zona.toLowerCase().includes(search.toLowerCase()))
-    .filter(p=>filter==="TODOS"||p.estado===filter)
+    .filter(p=>filter==="TODOS"||(filter==="DAR_SEGUIMIENTO"?["CALLBACK_SOLICITADO","EN_ZONA","VISITADO_INTERESADO","TRANSFERIDO_TECNICO"].includes(p.estado):p.estado===filter))
     .sort((a,b)=>b.score-a.score);
   return(
     <div style={{height:"100%",display:"flex",flexDirection:"column"}}>
@@ -605,7 +608,8 @@ function ListaDelDia({prospectos,onSelect,vendorId}){
 
 // ── VIEW: CHECKLIST ─────────────────────────────────────────────
 function Checklist({prospectos,onSelect,onUpdate,onToast,vendorId}){
-  const pend=prospectos.filter(p=>p.estado==="VISITADO_INTERESADO"&&!p.seguimiento&&(p.vendedor_id===CONFIG_USER.id||p.id_vendedor===CONFIG_USER.id)).sort((a,b)=>new Date(a.proximaAccion||"9999")-new Date(b.proximaAccion||"9999"));
+  const DAR_SEG=["CALLBACK_SOLICITADO","EN_ZONA","VISITADO_INTERESADO","TRANSFERIDO_TECNICO"];
+  const pend=prospectos.filter(p=>DAR_SEG.includes(p.estado)&&!p.seguimiento&&(p.vendedor_id===CONFIG_USER.id||p.id_vendedor===CONFIG_USER.id)).sort((a,b)=>new Date(a.proximaAccion||"9999")-new Date(b.proximaAccion||"9999"));
   return(
     <div style={{height:"100%",display:"flex",flexDirection:"column"}}>
       <div style={{padding:"16px 16px 8px"}}>
@@ -1174,7 +1178,7 @@ function AppMain({session,onLogout}){
 
   const unread=notifs.filter(n=>!n.read).length;
   const citasHoy=prospectos.filter(p=>p.estado==="CITA_AGENDADA"&&p.fechaCita===fmt(today)).length;
-  const checkCount=prospectos.filter(p=>p.estado==="VISITADO_INTERESADO"&&!p.seguimiento&&p.vendedor===CONFIG_USER.id).length;
+  const checkCount=prospectos.filter(p=>["CALLBACK_SOLICITADO","EN_ZONA","VISITADO_INTERESADO","TRANSFERIDO_TECNICO"].includes(p.estado)&&!p.seguimiento&&(p.vendedor===CONFIG_USER.id||p.vendedor_id===CONFIG_USER.id||p.id_vendedor===CONFIG_USER.id)).length;
 
   const showToast=useCallback((msg,type="info")=>setToast({message:msg,type}),[]);
   const addNotif=useCallback(n=>setNotifs(prev=>[n,...prev]),[]);
