@@ -803,25 +803,7 @@ function NuevaClinica({onToast,addNotif,prospectos}){
       });
       onToast("✅ Clínica guardada en Sheet","success");
     }catch(e){onToast("✅ Clínica agregada","success");}
-    if(andCall){
-      setTimeout(()=>{
-        // Use telefono from form so Ana calls THIS new clinic directly
-        const telNuevo = normalizeTel(form.telefono);
-        fetch(CONFIG.MAKE_WEBHOOK_E5,{method:"POST",headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({
-            zona:form.zona,
-            id_vendedor:CONFIG_USER.id,
-            max_llamadas:1,
-            telefono:telNuevo,
-            nombre_clinica:form.nombre,
-            doctor:form.doctor||"",
-            llamada_directa:true
-            // No id_prospecto — E5 usará teléfono directo
-          })});
-        onToast("🤖 Ana está llamando a "+form.nombre,"info");
-        addNotif({id:Date.now(),icon:"🤖",title:"Ana llamó a "+form.nombre,body:"Te avisamos cuando complete la llamada.",time:"Ahora mismo",read:false});
-      },800);
-    }
+
     setForm({nombre:"",telefono:"",direccion:"",zona:"",notas:"",doctor:"",labActual:"",resultadoVisita:"",objecion:"",clinicaDigital:"",waOptIn:false,tipoAccion:"",proximaAccion:""});
   };
 
@@ -932,12 +914,8 @@ function NuevaClinica({onToast,addNotif,prospectos}){
       </button>
 
       {mode==="agregar"&&(
-        <div style={{padding:"14px",background:"#F5F3FF",border:"1.5px solid #DDD6FE",borderRadius:12}}>
-          <div style={{fontSize:13,fontWeight:700,color:"#7C3AED",marginBottom:6}}>🤖 Agregar y que Ana llame ahora</div>
-          <div style={{fontSize:12,color:"#6D28D9",marginBottom:10}}>Ana intentará agendar una cita de inmediato.</div>
-          <button onClick={()=>handleSave(true)} style={{width:"100%",padding:"12px",background:"#8B5CF6",color:"white",border:"none",borderRadius:10,fontSize:14,fontWeight:700,cursor:"pointer"}}>
-            🤖 Agregar y Llamar con Ana
-          </button>
+        <div style={{padding:"12px 14px",background:"#F0FDF4",border:"1.5px solid #BBF7D0",borderRadius:12}}>
+          <div style={{fontSize:12,color:"#166534"}}>💡 Para que Ana llame a esta clínica, recarga la app y búscala en Lista → toca "Ana llama ahora"</div>
         </div>
       )}
 
