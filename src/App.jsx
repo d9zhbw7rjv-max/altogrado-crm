@@ -668,13 +668,14 @@ function Checklist({prospectos,onSelect,onUpdate,onToast,vendorId}){
 }
 
 // ── VIEW: PLAN SEMANAL (3 semanas) ─────────────────────────────
-function PlanSemanal({prospectos,onToast}){
+function PlanSemanal({prospectos,onToast,plan,setPlan}){
   const WEEKS=[{key:W0,label:"Esta semana",short:"W0"},{key:W1,label:"Próx. semana",short:"W1"},{key:W2,label:"En 2 semanas",short:"W2"}];
   const [active,setActive]=useState(W1);
-  const [plan,setPlan]=useState(INIT_PLAN);
+  // plan and setPlan come from AppMain props — no local state needed
+  const planLocal = plan || INIT_PLAN;
 
-  // Load Plan Semanal from Sheet
-  useEffect(()=>{
+  // REMOVED local plan load — AppMain handles it
+  const _unused = () => {
     const sheetId=CONFIG.SHEET_ID;
     const apiKey=CONFIG.API_KEY;
     if(sheetId==="YOUR_GOOGLE_SHEET_ID") return;
@@ -1036,7 +1037,7 @@ function DashboardGerencia({prospectos}){
 
   // Calculate % growth vs last month and vs last year same month
   const calcGrowth = (current, previous) => {
-    if(previous === 0) return current > 0 ? "+100%" : "—";
+    if(previous === 0) return current > 0 ? "+100%" : "-";
     const pct = Math.round(((current - previous) / previous) * 100);
     return (pct >= 0 ? "+" : "") + pct + "%";
   };
@@ -1386,6 +1387,35 @@ function AppMain({session,onLogout}){
   },[]);
 
   const [sistemaActivo,setSistemaActivo]=useState(true);
+  const [plan,setPlan]=useState(INIT_PLAN);
+
+  // Load Plan Semanal from Sheet into AppMain so all views can access it
+  useEffect(()=>{
+    const sheetId=CONFIG.SHEET_ID;
+    const apiKey=CONFIG.API_KEY;
+    if(!sheetId||sheetId==="YOUR_GOOGLE_SHEET_ID") return;
+    const range="Plan Semanal!A2:R50";
+    const url=`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(range)}?key=${apiKey}`;
+    fetch(url).then(r=>r.json()).then(data=>{
+      if(!data.values) return;
+      const currentVendorId = CONFIG_USER.id||"";
+      if(!currentVendorId) return;
+      const planData={...INIT_PLAN};
+      data.values.forEach(row=>{
+        const planKey=row[17]||"";
+        const semana=row[1]||"";
+        const idVend=row[3]||"";
+        if(!planKey||![W0,W1,W2].includes(semana)||idVend!==currentVendorId) return;
+        planData[semana]={
+          semana,
+          LUNES:row[4]||"",MARTES:row[5]||"",
+          "MIÉRCOLES":row[6]||"",JUEVES:row[7]||"",VIERNES:row[8]||"",
+          locked:semana===W0,
+        };
+      });
+      setPlan(planData);
+    }).catch(()=>{});
+  },[]);
 
   // Load sistema status from sheet on mount
   useEffect(()=>{
@@ -1468,7 +1498,7 @@ function AppMain({session,onLogout}){
         {view==="mapa"&&<MapaDelDia prospectos={prospectos} onSelect={setSelected} onToast={showToast} addNotif={addNotif} plan={plan}/>}
         {view==="lista"&&<ListaDelDia prospectos={prospectos} onSelect={setSelected} vendorId={CONFIG_USER.id}/>}
         {view==="checklist"&&<Checklist prospectos={prospectos} onSelect={setSelected} onUpdate={updateP} onToast={showToast} vendorId={CONFIG_USER.id}/>}
-        {view==="plan"&&<PlanSemanal prospectos={prospectos} onToast={showToast}/>}
+        {view==="plan"&&<PlanSemanal prospectos={prospectos} onToast={showToast} plan={plan} setPlan={setPlan}/>}
         {view==="nueva"&&<NuevaClinica onToast={showToast} addNotif={addNotif} prospectos={prospectos}/>}
         {view==="dashboard"&&<DashboardGerencia prospectos={prospectos}/>}
       </div>
