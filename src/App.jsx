@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
 const CONFIG = {
-  SHEET_ID: "1zjE1N808vj4tLl6cwD3fSbxGS3bVkCWe-wqJXMKA4zk",
-  API_KEY: "AIzaSyDtSmr2Z_konxk5HjhCUH4A1_K0Md1ebZ4",
+  SHEET_ID: "YOUR_GOOGLE_SHEET_ID",
+  API_KEY: "YOUR_GOOGLE_SHEETS_API_KEY",
   MAPS_KEY: import.meta.env.VITE_MAPS_KEY || "",
-  MAKE_WEBHOOK_E5: "https://hook.us2.make.com/jyfj767nmqfnpj7uk8srlyvudficta7x",
+  MAKE_WEBHOOK_E5: "https://hook.eu1.make.com/YOUR_ESCENARIO5_URL",
   MAKE_WEBHOOK_RESULT: "https://hook.eu1.make.com/YOUR_RESULTADO_URL",
-  MAKE_WEBHOOK_E7: "https://hook.us2.make.com/aodn54hswhl3cyvynkto3f5hbhwaftna",
+  MAKE_WEBHOOK_E7: "https://hook.eu1.make.com/YOUR_E7_URL",
 };
 
 // Session stored in memory — resets on app close
@@ -672,38 +672,9 @@ function PlanSemanal({prospectos,onToast,plan,setPlan}){
   const WEEKS=[{key:W0,label:"Esta semana",short:"W0"},{key:W1,label:"Próx. semana",short:"W1"},{key:W2,label:"En 2 semanas",short:"W2"}];
   const [active,setActive]=useState(W1);
   // plan and setPlan come from AppMain props — no local state needed
-  const planLocal = plan || INIT_PLAN;
 
-  // REMOVED local plan load — AppMain handles it
-  const _unused = () => {
-    const sheetId=CONFIG.SHEET_ID;
-    const apiKey=CONFIG.API_KEY;
-    if(sheetId==="YOUR_GOOGLE_SHEET_ID") return;
-    const range="Plan Semanal!A2:R50";
-    const url=`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(range)}?key=${apiKey}`;
-    fetch(url).then(r=>r.json()).then(data=>{
-      if(!data.values) return;
-      const currentVendorId = CONFIG_USER.id || "";
-      if(!currentVendorId) { console.log("No vendor ID yet"); return; }
-      const planData={...INIT_PLAN};
-      data.values.forEach(row=>{
-        const planKey=row[17]||""; // col R = PLAN_KEY
-        const semana=row[1]||"";   // col B = SEMANA
-        const idVend=row[3]||""; // col D = ID VENDEDOR
-        if(!planKey||![W0,W1,W2].includes(semana)||idVend!==currentVendorId) return;
-        planData[semana]={
-          semana,
-          LUNES:      row[4]||"",  // col E
-          MARTES:     row[5]||"",  // col F
-          MIÉRCOLES:  row[6]||"",  // col G
-          JUEVES:     row[7]||"",  // col H
-          VIERNES:    row[8]||"",  // col I
-          locked:     semana===W0,
-        };
-      });
-      setPlan(planData);
-    }).catch(()=>{});
-  },[]);
+
+
   const DIAS=["LUNES","MARTES","MIÉRCOLES","JUEVES","VIERNES"];
   const getCount=zona=>prospectos.filter(p=>p.zona===zona&&p.estado!=="CLIENTE_ACTIVO"&&p.estado!=="DESCARTADO").length;
   const getCitas=zona=>prospectos.filter(p=>p.zona===zona&&p.estado==="CITA_AGENDADA").length;
