@@ -813,7 +813,10 @@ function NuevaClinica({onToast,addNotif,prospectos}){
             id_vendedor:CONFIG_USER.id,
             max_llamadas:1,
             telefono:telNuevo,
-            id_prospecto:"NUEVO-"+Date.now() // temp ID until sheet saves
+            nombre_clinica:form.nombre,
+            doctor:form.doctor||"",
+            llamada_directa:true
+            // No id_prospecto — E5 usará teléfono directo
           })});
         onToast("🤖 Ana está llamando a "+form.nombre,"info");
         addNotif({id:Date.now(),icon:"🤖",title:"Ana llamó a "+form.nombre,body:"Te avisamos cuando complete la llamada.",time:"Ahora mismo",read:false});
@@ -1136,6 +1139,93 @@ function DashboardGerencia({prospectos}){
   );
 }
 
+
+// ── DASHBOARD VENDEDOR ──────────────────────────────────────────
+function DashboardVendedor({prospectos}){
+  const myProspectos = prospectos.filter(p=>
+    p.vendedor_id===CONFIG_USER.id||p.id_vendedor===CONFIG_USER.id||p.vendedor===CONFIG_USER.id
+  );
+  const today = new Date().toISOString().split("T")[0];
+
+  const ESTADOS = [
+    {key:"NUEVO", label:"Nuevos", color:"#94A3B8"},
+    {key:"LLAMADA_PENDIENTE", label:"Contactados", color:"#8B5CF6"},
+    {key:"CALLBACK_SOLICITADO", label:"Callback", color:"#F59E0B"},
+    {key:"CITA_AGENDADA", label:"Citas", color:"#3B82F6"},
+    {key:"VISITADO_INTERESADO", label:"Interesados", color:"#10B981"},
+    {key:"PRIMER_PEDIDO", label:"1er Pedido", color:"#06B6D4"},
+    {key:"CLIENTE_ACTIVO", label:"Clientes", color:"#22C55E"},
+  ];
+
+  const citasHoy = myProspectos.filter(p=>p.estado==="CITA_AGENDADA"&&p.proximaAccion===today);
+  const seguimientosPendientes = myProspectos.filter(p=>
+    ["VISITADO_INTERESADO","CALLBACK_SOLICITADO","TRANSFERIDO_TECNICO"].includes(p.estado)&&
+    !p.seguimiento&&p.proximaAccion&&p.proximaAccion<=today
+  );
+
+  return(
+    <div style={{height:"100%",overflowY:"auto",background:"#F8FAFC",padding:"16px"}}>
+      <div style={{fontSize:18,fontWeight:800,color:"#0F172A",marginBottom:4}}>📊 Mi Dashboard</div>
+      <div style={{fontSize:12,color:"#64748B",marginBottom:16}}>{CONFIG_USER.name} · {new Date().toLocaleDateString("es-MX",{weekday:"long",day:"numeric",month:"long"})}</div>
+
+      {/* Alertas del día */}
+      {(citasHoy.length > 0 || seguimientosPendientes.length > 0) && (
+        <div style={{background:"#FFF7ED",border:"1.5px solid #FED7AA",borderRadius:12,padding:12,marginBottom:16}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#C2410C",marginBottom:8}}>⚠️ Atención hoy</div>
+          {citasHoy.length > 0 && (
+            <div style={{fontSize:12,color:"#9A3412",marginBottom:4}}>📅 {citasHoy.length} cita{citasHoy.length>1?"s":""} programada{citasHoy.length>1?"s":""} hoy</div>
+          )}
+          {seguimientosPendientes.length > 0 && (
+            <div style={{fontSize:12,color:"#9A3412"}}>✅ {seguimientosPendientes.length} seguimiento{seguimientosPendientes.length>1?"s":""} pendiente{seguimientosPendientes.length>1?"s":""}</div>
+          )}
+        </div>
+      )}
+
+      {/* Mi embudo */}
+      <div style={{background:"white",borderRadius:14,padding:16,marginBottom:16,boxShadow:"0 1px 4px rgba(0,0,0,0.08)"}}>
+        <div style={{fontSize:13,fontWeight:700,color:"#0F172A",marginBottom:12}}>Mi Pipeline</div>
+        {ESTADOS.map(e=>{
+          const count = myProspectos.filter(p=>p.estado===e.key).length;
+          const total = myProspectos.length || 1;
+          return(
+            <div key={e.key} style={{marginBottom:10}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                <span style={{fontSize:12,color:"#475569"}}>{e.label}</span>
+                <span style={{fontSize:12,fontWeight:700,color:"#0F172A"}}>{count}</span>
+              </div>
+              <div style={{height:7,background:"#F1F5F9",borderRadius:4,overflow:"hidden"}}>
+                <div style={{height:"100%",width:Math.round((count/total)*100)+"%",background:e.color,borderRadius:4}}/>
+              </div>
+            </div>
+          );
+        })}
+        <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid #F1F5F9",display:"flex",justifyContent:"space-between"}}>
+          <span style={{fontSize:12,color:"#64748B"}}>Total mis prospectos</span>
+          <span style={{fontSize:13,fontWeight:800,color:"#7C3AED"}}>{myProspectos.length}</span>
+        </div>
+      </div>
+
+      {/* Citas próximas */}
+      <div style={{background:"white",borderRadius:14,padding:16,boxShadow:"0 1px 4px rgba(0,0,0,0.08)"}}>
+        <div style={{fontSize:13,fontWeight:700,color:"#0F172A",marginBottom:12}}>📅 Próximas Citas</div>
+        {myProspectos.filter(p=>p.estado==="CITA_AGENDADA"&&p.proximaAccion>=today)
+          .sort((a,b)=>a.proximaAccion.localeCompare(b.proximaAccion))
+          .slice(0,5)
+          .map(p=>(
+            <div key={p.id} style={{padding:"10px 0",borderBottom:"1px solid #F1F5F9"}}>
+              <div style={{fontSize:13,fontWeight:600,color:"#0F172A"}}>{p.nombre}</div>
+              <div style={{fontSize:11,color:"#64748B"}}>{p.proximaAccion}{p.horaCita?" · "+p.horaCita:""} · {p.zona}</div>
+            </div>
+          ))
+        }
+        {myProspectos.filter(p=>p.estado==="CITA_AGENDADA"&&p.proximaAccion>=today).length===0&&(
+          <div style={{fontSize:12,color:"#94A3B8",textAlign:"center",padding:"20px 0"}}>Sin citas próximas</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── LOGIN SCREEN ───────────────────────────────────────────────
 function LoginScreen({onLogin}){
   const [idVendedor,setIdVendedor]=useState("");
@@ -1433,7 +1523,7 @@ function AppMain({session,onLogout}){
     {id:"checklist",icon:"✅",label:"Check",badge:checkCount},
     {id:"plan",icon:"📅",label:"Plan"},
     {id:"nueva",icon:"➕",label:"Nueva"},
-    ...(["VEND-002","VEND-004"].includes(CONFIG_USER.id)?[{id:"dashboard",icon:"📊",label:"Dash"}]:[]),
+    {id:"dashboard",icon:"📊",label:"Dash"},
   ];
 
   return(
@@ -1471,7 +1561,10 @@ function AppMain({session,onLogout}){
         {view==="checklist"&&<Checklist prospectos={prospectos} onSelect={setSelected} onUpdate={updateP} onToast={showToast} vendorId={CONFIG_USER.id}/>}
         {view==="plan"&&<PlanSemanal prospectos={prospectos} onToast={showToast} plan={plan} setPlan={setPlan}/>}
         {view==="nueva"&&<NuevaClinica onToast={showToast} addNotif={addNotif} prospectos={prospectos}/>}
-        {view==="dashboard"&&<DashboardGerencia prospectos={prospectos}/>}
+        {view==="dashboard"&&(["VEND-002","VEND-004"].includes(CONFIG_USER.id)?
+          <DashboardGerencia prospectos={prospectos}/>:
+          <DashboardVendedor prospectos={prospectos}/>
+        )}
       </div>
 
       {/* Bottom Nav */}
