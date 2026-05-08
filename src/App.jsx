@@ -674,8 +674,8 @@ function PlanSemanal({prospectos,onToast}){
     const url=`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(range)}?key=${apiKey}`;
     fetch(url).then(r=>r.json()).then(data=>{
       if(!data.values) return;
-      const currentVendorId = CONFIG_USER.id;
-      if(!currentVendorId) return; // wait until logged in
+      const currentVendorId = CONFIG_USER.id || "";
+      if(!currentVendorId) { console.log("No vendor ID yet"); return; }
       const planData={...INIT_PLAN};
       data.values.forEach(row=>{
         const planKey=row[17]||""; // col R = PLAN_KEY
@@ -694,7 +694,7 @@ function PlanSemanal({prospectos,onToast}){
       });
       setPlan(planData);
     }).catch(()=>{});
-  },[session]);
+  },[]);
   const DIAS=["LUNES","MARTES","MIÉRCOLES","JUEVES","VIERNES"];
   const getCount=zona=>prospectos.filter(p=>p.zona===zona&&p.estado!=="CLIENTE_ACTIVO"&&p.estado!=="DESCARTADO").length;
   const getCitas=zona=>prospectos.filter(p=>p.zona===zona&&p.estado==="CITA_AGENDADA").length;
