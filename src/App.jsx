@@ -411,7 +411,7 @@ function ProspectoModal({p,onClose,onUpdate,onToast,plan,addNotif}){
 }
 
 // ── VIEW: MAPA DEL DÍA ─────────────────────────────────────────
-function MapaDelDia({prospectos,onSelect,onToast,addNotif}){
+function MapaDelDia({prospectos,onSelect,onToast,addNotif,plan}){
   const [vistaFecha,setVistaFecha]=useState("hoy");
   const startOfWeek=new Date(today);
   startOfWeek.setDate(today.getDate()-today.getDay()+1);
@@ -429,7 +429,15 @@ function MapaDelDia({prospectos,onSelect,onToast,addNotif}){
     return (a.horaCita||"").localeCompare(b.horaCita||"");
   });
   const citasMostrar=vistaFecha==="hoy"?citasHoy:citasSemana;
-  const zonas=[...new Set(prospectos.filter(p=>p.estado!=="CLIENTE_ACTIVO"&&p.estado!=="DESCARTADO"&&(p.vendedor_id===CONFIG_USER.id||p.id_vendedor===CONFIG_USER.id)).map(p=>p.zona))].slice(0,6);
+  // Zonas del plan semanal actual del vendedor
+  const planHoy = plan && plan[W0] ? plan[W0] : null;
+  const zonasDelPlan = planHoy ? [
+    planHoy.LUNES, planHoy.MARTES, planHoy["MIÉRCOLES"],
+    planHoy.JUEVES, planHoy.VIERNES
+  ].filter(z=>z&&z.trim()!=="") : [];
+  const zonasDeDia = [...new Set(zonasDelPlan)]; // deduplicated
+  const zonas = zonasDeDia.length > 0 ? zonasDeDia :
+    [...new Set(prospectos.filter(p=>p.estado!=="CLIENTE_ACTIVO"&&p.estado!=="DESCARTADO"&&(p.vendedor_id===CONFIG_USER.id||p.id_vendedor===CONFIG_USER.id)).map(p=>p.zona))].slice(0,6);
 
   return(
     <div style={{height:"100%",overflowY:"auto",padding:"0 0 80px"}}>
@@ -825,8 +833,16 @@ function NuevaClinica({onToast,addNotif,prospectos}){
     }catch(e){onToast("✅ Clínica agregada","success");}
     if(andCall){
       setTimeout(()=>{
+        // Use telefono from form so Ana calls THIS new clinic directly
+        const telNuevo = normalizeTel(form.telefono);
         fetch(CONFIG.MAKE_WEBHOOK_E5,{method:"POST",headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({zona:form.zona,id_vendedor:CONFIG_USER.id,max_llamadas:1})});
+          body:JSON.stringify({
+            zona:form.zona,
+            id_vendedor:CONFIG_USER.id,
+            max_llamadas:1,
+            telefono:telNuevo,
+            id_prospecto:"NUEVO-"+Date.now() // temp ID until sheet saves
+          })});
         onToast("🤖 Ana está llamando a "+form.nombre,"info");
         addNotif({id:Date.now(),icon:"🤖",title:"Ana llamó a "+form.nombre,body:"Te avisamos cuando complete la llamada.",time:"Ahora mismo",read:false});
       },800);
@@ -980,6 +996,173 @@ function NuevaClinica({onToast,addNotif,prospectos}){
   );
 }
 
+
+
+// ── DASHBOARD GERENCIA ──────────────────────────────────────────
+function DashboardGerencia({prospectos}){
+  const now = new Date();
+  const thisYear = now.getFullYear();
+  const thisMonth = now.getMonth(); // 0-indexed
+
+  const MESES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+  const ESTADOS_EMBUDO = [
+    {key:"NUEVO", label:"Nuevos"},
+    {key:"LLAMADA_PENDIENTE", label:"Contactados"},
+    {key:"CITA_AGENDADA", label:"Cita Agendada"},
+    {key:"VISITADO_INTERESADO", label:"Visitado Interesado"},
+    {key:"PRIMER_PEDIDO", label:"Primer Pedido"},
+    {key:"CLIENTE_ACTIVO", label:"Cliente Activo"},
+  ];
+
+  // Get count by estado, month, year
+  const getCount = (estado, month, year) => {
+    return prospectos.filter(p => {
+      if(p.estado !== estado) return false;
+      const dateStr = p.ultimoContacto || p.fechaCreacion || "";
+      if(!dateStr) return false;
+      const d = new Date(dateStr + "T12:00:00");
+      return d.getFullYear() === year && d.getMonth() === month;
+    }).length;
+  };
+
+  // Acumulado anual = total current estado regardless of date (snapshot)
+  const getTotal = (estado) => prospectos.filter(p => p.estado === estado).length;
+
+  // Build monthly data for current and last year
+  const months = [];
+  for(let m = 0; m <= thisMonth; m++){
+    months.push({month: m, label: MESES[m]});
+  }
+
+  // Calculate % growth vs last month and vs last year same month
+  const calcGrowth = (current, previous) => {
+    if(previous === 0) return current > 0 ? "+100%" : "—";
+    const pct = Math.round(((current - previous) / previous) * 100);
+    return (pct >= 0 ? "+" : "") + pct + "%";
+  };
+
+  const [selectedEstado, setSelectedEstado] = useState(ESTADOS_EMBUDO[2].key);
+  const [tab, setTab] = useState("mensual");
+
+  const selectedLabel = ESTADOS_EMBUDO.find(e=>e.key===selectedEstado)?.label || selectedEstado;
+
+  return(
+    <div style={{height:"100%",overflowY:"auto",background:"#F8FAFC",padding:"16px"}}>
+      <div style={{fontSize:18,fontWeight:800,color:"#0F172A",marginBottom:4}}>📊 Dashboard Gerencia</div>
+      <div style={{fontSize:12,color:"#64748B",marginBottom:16}}>Vista ejecutiva — {thisYear}</div>
+
+      {/* Embudo total actual */}
+      <div style={{background:"white",borderRadius:14,padding:16,marginBottom:16,boxShadow:"0 1px 4px rgba(0,0,0,0.08)"}}>
+        <div style={{fontSize:13,fontWeight:700,color:"#0F172A",marginBottom:12}}>Embudo Actual</div>
+        {ESTADOS_EMBUDO.map((e,i)=>{
+          const total = getTotal(e.key);
+          const maxTotal = getTotal(ESTADOS_EMBUDO[0].key) || 1;
+          const pct = Math.round((total/maxTotal)*100);
+          return(
+            <div key={e.key} style={{marginBottom:10,cursor:"pointer"}} onClick={()=>setSelectedEstado(e.key)}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                <span style={{fontSize:12,color:selectedEstado===e.key?"#7C3AED":"#475569",fontWeight:selectedEstado===e.key?700:400}}>{e.label}</span>
+                <span style={{fontSize:12,fontWeight:700,color:"#0F172A"}}>{total.toLocaleString()}</span>
+              </div>
+              <div style={{height:8,background:"#F1F5F9",borderRadius:4,overflow:"hidden"}}>
+                <div style={{height:"100%",width:pct+"%",background:selectedEstado===e.key?"#7C3AED":"#3B82F6",borderRadius:4,transition:"width 0.3s"}}/>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Tabs mensual / vendedor */}
+      <div style={{display:"flex",background:"#F1F5F9",borderRadius:10,padding:3,marginBottom:12}}>
+        {["mensual","vendedor"].map(t=>(
+          <button key={t} onClick={()=>setTab(t)} style={{flex:1,padding:"8px",background:tab===t?"white":"transparent",border:"none",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",color:tab===t?"#0F172A":"#94A3B8"}}>
+            {t==="mensual"?"📅 Por Mes":"👤 Por Vendedor"}
+          </button>
+        ))}
+      </div>
+
+      {/* Tabla mensual */}
+      {tab==="mensual"&&(
+        <div style={{background:"white",borderRadius:14,padding:16,boxShadow:"0 1px 4px rgba(0,0,0,0.08)"}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#0F172A",marginBottom:12}}>{selectedLabel} — Mensual {thisYear}</div>
+          <div style={{overflowX:"auto"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+              <thead>
+                <tr style={{borderBottom:"2px solid #E2E8F0"}}>
+                  <th style={{textAlign:"left",padding:"6px 4px",color:"#64748B"}}>Mes</th>
+                  <th style={{textAlign:"right",padding:"6px 4px",color:"#64748B"}}>Este año</th>
+                  <th style={{textAlign:"right",padding:"6px 4px",color:"#64748B"}}>Año ant.</th>
+                  <th style={{textAlign:"right",padding:"6px 4px",color:"#64748B"}}>vs mes ant.</th>
+                  <th style={{textAlign:"right",padding:"6px 4px",color:"#64748B"}}>vs año ant.</th>
+                </tr>
+              </thead>
+              <tbody>
+                {months.map(({month,label})=>{
+                  const curr = getCount(selectedEstado, month, thisYear);
+                  const prevMonth = month > 0 ? getCount(selectedEstado, month-1, thisYear) : 0;
+                  const prevYear = getCount(selectedEstado, month, thisYear-1);
+                  const gVsMes = calcGrowth(curr, prevMonth);
+                  const gVsAno = calcGrowth(curr, prevYear);
+                  const colorMes = gVsMes.startsWith("+") ? "#10B981" : gVsMes==="-" ? "#94A3B8" : "#EF4444";
+                  const colorAno = gVsAno.startsWith("+") ? "#10B981" : gVsAno==="-" ? "#94A3B8" : "#EF4444";
+                  return(
+                    <tr key={month} style={{borderBottom:"1px solid #F1F5F9",background:month===thisMonth?"#F5F3FF":"white"}}>
+                      <td style={{padding:"7px 4px",fontWeight:month===thisMonth?700:400,color:"#0F172A"}}>{label}{month===thisMonth?" ◀":""}</td>
+                      <td style={{textAlign:"right",padding:"7px 4px",fontWeight:700,color:"#0F172A"}}>{curr}</td>
+                      <td style={{textAlign:"right",padding:"7px 4px",color:"#64748B"}}>{prevYear}</td>
+                      <td style={{textAlign:"right",padding:"7px 4px",fontWeight:600,color:colorMes}}>{gVsMes}</td>
+                      <td style={{textAlign:"right",padding:"7px 4px",fontWeight:600,color:colorAno}}>{gVsAno}</td>
+                    </tr>
+                  );
+                })}
+                {/* Acumulado */}
+                <tr style={{borderTop:"2px solid #E2E8F0",background:"#F8FAFC"}}>
+                  <td style={{padding:"8px 4px",fontWeight:800,color:"#0F172A"}}>TOTAL</td>
+                  <td style={{textAlign:"right",padding:"8px 4px",fontWeight:800,color:"#7C3AED"}}>{getTotal(selectedEstado)}</td>
+                  <td style={{textAlign:"right",padding:"8px 4px",color:"#64748B"}}>
+                    {months.reduce((s,{month})=>s+getCount(selectedEstado,month,thisYear-1),0)}
+                  </td>
+                  <td colSpan={2} style={{textAlign:"right",padding:"8px 4px",fontWeight:700,color:"#10B981"}}>
+                    {calcGrowth(getTotal(selectedEstado), months.reduce((s,{month})=>s+getCount(selectedEstado,month,thisYear-1),0))}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Tabla por vendedor */}
+      {tab==="vendedor"&&(
+        <div style={{background:"white",borderRadius:14,padding:16,boxShadow:"0 1px 4px rgba(0,0,0,0.08)"}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#0F172A",marginBottom:12}}>Performance por Vendedor</div>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+            <thead>
+              <tr style={{borderBottom:"2px solid #E2E8F0"}}>
+                <th style={{textAlign:"left",padding:"6px 4px",color:"#64748B"}}>Vendedor</th>
+                {ESTADOS_EMBUDO.slice(2).map(e=>(
+                  <th key={e.key} style={{textAlign:"right",padding:"6px 4px",color:"#64748B"}}>{e.label.split(" ")[0]}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {[...new Set(prospectos.map(p=>p.vendedor).filter(Boolean))].map(vendedor=>(
+                <tr key={vendedor} style={{borderBottom:"1px solid #F1F5F9"}}>
+                  <td style={{padding:"7px 4px",fontWeight:600,color:"#0F172A",maxWidth:80,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{vendedor.split(" ")[0]}</td>
+                  {ESTADOS_EMBUDO.slice(2).map(e=>(
+                    <td key={e.key} style={{textAlign:"right",padding:"7px 4px",color:"#0F172A"}}>
+                      {prospectos.filter(p=>p.vendedor===vendedor&&p.estado===e.key).length}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── LOGIN SCREEN ───────────────────────────────────────────────
 function LoginScreen({onLogin}){
@@ -1249,6 +1432,7 @@ function AppMain({session,onLogout}){
     {id:"checklist",icon:"✅",label:"Check",badge:checkCount},
     {id:"plan",icon:"📅",label:"Plan"},
     {id:"nueva",icon:"➕",label:"Nueva"},
+    ...(["VEND-002","VEND-004"].includes(CONFIG_USER.id)?[{id:"dashboard",icon:"📊",label:"Dash"}]:[]),
   ];
 
   return(
@@ -1281,11 +1465,12 @@ function AppMain({session,onLogout}){
 
       {/* Content */}
       <div style={{flex:1,overflow:"hidden"}}>
-        {view==="mapa"&&<MapaDelDia prospectos={prospectos} onSelect={setSelected} onToast={showToast} addNotif={addNotif}/>}
+        {view==="mapa"&&<MapaDelDia prospectos={prospectos} onSelect={setSelected} onToast={showToast} addNotif={addNotif} plan={plan}/>}
         {view==="lista"&&<ListaDelDia prospectos={prospectos} onSelect={setSelected} vendorId={CONFIG_USER.id}/>}
         {view==="checklist"&&<Checklist prospectos={prospectos} onSelect={setSelected} onUpdate={updateP} onToast={showToast} vendorId={CONFIG_USER.id}/>}
         {view==="plan"&&<PlanSemanal prospectos={prospectos} onToast={showToast}/>}
         {view==="nueva"&&<NuevaClinica onToast={showToast} addNotif={addNotif} prospectos={prospectos}/>}
+        {view==="dashboard"&&<DashboardGerencia prospectos={prospectos}/>}
       </div>
 
       {/* Bottom Nav */}
