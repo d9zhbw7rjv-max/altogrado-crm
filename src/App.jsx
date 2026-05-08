@@ -1140,6 +1140,58 @@ function AppMain({session,onLogout}){
         setProspectos(rows);
         setLoadingSheet(false);
         console.log(`✅ Cargados ${rows.length} prospectos del Sheet`);
+
+        // Generate dynamic notifications
+        try {
+          const today = new Date().toISOString().split("T")[0];
+          const vendorId = CONFIG_USER.id;
+          const generated = [];
+          rows.forEach(p => {
+            const isMyProspecto = p.vendedor_id===vendorId || p.id_vendedor===vendorId || p.vendedor===vendorId;
+            if (!isMyProspecto) return;
+            // Citas agendadas
+            if (p.estado==="CITA_AGENDADA" && p.proximaAccion) {
+              const isToday = p.proximaAccion === today;
+              const isFuture = p.proximaAccion > today;
+              if (isToday || isFuture) {
+                generated.push({
+                  id: `cita-${p.id}`,
+                  icon: "📅",
+                  title: `Cita — ${p.nombre}`,
+                  body: `${p.proximaAccion}${p.horaCita ? " a las " + p.horaCita : ""}`,
+                  time: p.proximaAccion,
+                  read: false
+                });
+              }
+            }
+            // Callbacks para hoy
+            if (p.estado==="CALLBACK_SOLICITADO" && p.proximaAccion===today) {
+              generated.push({
+                id: `cb-${p.id}`,
+                icon: "📞",
+                title: `Callback hoy — ${p.nombre}`,
+                body: `El doctor pidió que lo llamen hoy`,
+                time: today,
+                read: false
+              });
+            }
+            // Seguimientos vencidos o de hoy
+            if (["VISITADO_INTERESADO","TRANSFERIDO_TECNICO"].includes(p.estado) && !p.seguimiento && p.proximaAccion && p.proximaAccion <= today) {
+              generated.push({
+                id: `seg-${p.id}`,
+                icon: "✅",
+                title: `Seguimiento — ${p.nombre}`,
+                body: `${p.tipoAccion||"LLAMADA"} · ${p.proximaAccion}`,
+                time: p.proximaAccion,
+                read: p.proximaAccion < today
+              });
+            }
+          });
+          generated.sort((a,b) => b.time.localeCompare(a.time));
+          setNotifs(generated.slice(0, 20));
+        } catch(e) {
+          console.log("Notifs generation skipped:", e.message);
+        }
       })
       .catch(e=>{
         console.error("Error loading Sheet:",e);
