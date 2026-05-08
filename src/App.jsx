@@ -674,12 +674,14 @@ function PlanSemanal({prospectos,onToast}){
     const url=`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(range)}?key=${apiKey}`;
     fetch(url).then(r=>r.json()).then(data=>{
       if(!data.values) return;
+      const currentVendorId = CONFIG_USER.id;
+      if(!currentVendorId) return; // wait until logged in
       const planData={...INIT_PLAN};
       data.values.forEach(row=>{
         const planKey=row[17]||""; // col R = PLAN_KEY
         const semana=row[1]||"";   // col B = SEMANA
         const idVend=row[3]||""; // col D = ID VENDEDOR
-        if(!planKey||![W0,W1,W2].includes(semana)||idVend!==CONFIG_USER.id) return;
+        if(!planKey||![W0,W1,W2].includes(semana)||idVend!==currentVendorId) return;
         planData[semana]={
           semana,
           LUNES:      row[4]||"",  // col E
@@ -692,7 +694,7 @@ function PlanSemanal({prospectos,onToast}){
       });
       setPlan(planData);
     }).catch(()=>{});
-  },[]);
+  },[session]);
   const DIAS=["LUNES","MARTES","MIÉRCOLES","JUEVES","VIERNES"];
   const getCount=zona=>prospectos.filter(p=>p.zona===zona&&p.estado!=="CLIENTE_ACTIVO"&&p.estado!=="DESCARTADO").length;
   const getCitas=zona=>prospectos.filter(p=>p.zona===zona&&p.estado==="CITA_AGENDADA").length;
