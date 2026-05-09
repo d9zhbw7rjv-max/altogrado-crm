@@ -708,7 +708,34 @@ function PlanSemanal({prospectos,onToast,plan,setPlan}){
           <div style={{padding:"12px 14px",background:"#FFFBEB",border:"1.5px solid #FCD34D",borderRadius:12,marginBottom:14}}>
             <div style={{fontSize:13,fontWeight:700,color:"#92400E"}}>¡Es viernes! Avanza el plan 📅</div>
             <div style={{fontSize:12,color:"#92400E",marginTop:4}}>Mañana la próxima semana se convierte en esta semana.</div>
-            <button onClick={()=>{setPlan(prev=>({[W0]:{...prev[W1]},Deleted:[W1],Added:{[W1]:{...prev[W2]},[W2]:{semana:W2,LUNES:"",MARTES:"",MIÉRCOLES:"",JUEVES:"",VIERNES:"",locked:false}}}));onToast("✅ Plan avanzado","success");setActive(W0);}} style={{marginTop:8,padding:"6px 14px",background:"#F59E0B",color:"white",border:"none",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer"}}>
+            <button onClick={async()=>{
+                const planW1 = plan[W1] || {};
+                // Save W1 as new W0 in Sheet
+                try {
+                  await fetch(CONFIG.MAKE_WEBHOOK_E7,{method:"POST",headers:{"Content-Type":"application/json"},
+                    body:JSON.stringify({
+                      accion:"plan_semanal",
+                      semana:W0,
+                      id_vendedor:CONFIG_USER.id,
+                      lunes:planW1.LUNES||"",
+                      martes:planW1.MARTES||"",
+                      miercoles:planW1["MIÉRCOLES"]||"",
+                      jueves:planW1.JUEVES||"",
+                      viernes:planW1.VIERNES||""
+                    })});
+                  // Update local state
+                  setPlan(prev=>({
+                    ...prev,
+                    [W0]:{...prev[W1],semana:W0,locked:true},
+                    [W1]:{...prev[W2],semana:W1,locked:false},
+                    [W2]:{semana:W2,LUNES:"",MARTES:"",MIÉRCOLES:"",JUEVES:"",VIERNES:"",locked:false}
+                  }));
+                  onToast("✅ Plan avanzado y guardado","success");
+                  setActive(W0);
+                } catch(e){
+                  onToast("Error al avanzar plan","error");
+                }
+              }} style={{marginTop:8,padding:"6px 14px",background:"#F59E0B",color:"white",border:"none",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer"}}>
               Avanzar plan →
             </button>
           </div>
