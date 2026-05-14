@@ -19,7 +19,7 @@ const ZONAS_LIST = ['ANZURES','AZCAPOTZALCO','BENITO JUAREZ','CENTRO','CLAVERIA'
   'GRANADA','GUSTAVO A MADERO','IZTAPALAPA','LOMAS DE CHAPULTEPEC','LOMAS VERDES',
   'NAPOLES','NARVARTE','NAUCALPAN','PEDREGAL','POLANCO','POPOTLA',
   'SAN MIGUEL CHAPULTEPEC','SAN RAFAEL','SANTA FE','SATELITE','TLALPAN',
-  'TLANEPANTLA','TLATELOLCO','VILLA COAPA'];
+  'TLANEPANTLA','TLATELOLCO','VILLA COAPA','PACHUCA','ECATEPEC','XOCHIMILCO','IZTACALCO'];
 
 const ESTADO_CONFIG = {
   NUEVO:{color:"#94A3B8",bg:"#F8FAFC",label:"Nuevo"},
@@ -1499,7 +1499,7 @@ function AppMain({session,onLogout}){
       });
       setPlan(planData);
     }).catch(()=>{});
-  },[]);
+  },[session?.id_vendedor]);
 
   // Load sistema status from sheet on mount
   useEffect(()=>{
