@@ -298,7 +298,7 @@ function ProspectoModal({p,onClose,onUpdate,onToast,plan,addNotif}){
           <div style={{flex:1,overflowY:"auto",padding:20}}>
             {tab==="info"&&(
               <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                {[["📞","Teléfono",p.telefono],["📧","Email",p.email||"—"],["📍","Dirección",p.direccion],["🏥","Lab actual",p.labActual||"—"],["👤","Doctor",p.doctor||"—"],["🔄","Intentos",p.intentos||0],["📝","Notas",p.notas||"—"]].map(([icon,label,value])=>(
+                {[["📞","Teléfono",p.telefono],["📧","Email",p.email||"—"],["📍","Dirección",p.direccion],["🏥","Lab actual",p.labActual||"—"],["👤","Doctor",p.doctor||"—"],["🔄","Intentos",p.intentos||0],["📝","Notas",[(p.ult_resultado?"📞 "+p.ult_resultado:""),(p.notas?"📋 "+p.notas:"")].filter(Boolean).join(" | ")||"—"]].map(([icon,label,value])=>(
                   <div key={label} style={{padding:"10px 14px",background:"#F8FAFC",borderRadius:10}}>
                     <div style={{fontSize:11,color:"#94A3B8",marginBottom:2}}>{icon} {label}</div>
                     <div style={{fontSize:14,color:"#0F172A",wordBreak:"break-word"}}>{value}</div>
