@@ -1399,7 +1399,7 @@ function AppMain({session,onLogout}){
           tipoAccion:   row[33]||"",
           esCliente:    row[37]||"",
           seguimiento:  row[41]==="YES"||row[41]==="TRUE",
-          tipoTrabajo:  row[43]||"",  // col AR
+          tipoTrabajo:  row[39]||"",  // col AN
           fechaCompromiso:row[42]||"",
           score:        parseFloat(row[12])||0,
           objecion:     "",
