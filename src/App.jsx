@@ -814,6 +814,18 @@ function NuevaClinica({onToast,addNotif,prospectos}){
 
   const handleSave=async(andCall=false)=>{
     if(!form.nombre||!form.telefono){onToast("⚠️ Nombre y teléfono requeridos","error");return;}
+
+    // Map resultado_visita to correct ESTADO
+    const estadoMap = {
+      "INTERESADO":     "VISITADO_INTERESADO",
+      "NECESITA_PENSAR":"VISITADO_INTERESADO",  // sigue en pipeline
+      "NO_INTERESADO":  "VISITADO_NO_INTERESADO",
+      "NO_ESTABA":      "NUEVO",                // volver a intentar
+    };
+    const estadoFinal = mode==="visite" && form.resultadoVisita
+      ? (estadoMap[form.resultadoVisita] || "NUEVO")
+      : "NUEVO";
+
     try{
       await fetch(CONFIG.MAKE_WEBHOOK_E7,{method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({
@@ -821,14 +833,18 @@ function NuevaClinica({onToast,addNotif,prospectos}){
           nombre:form.nombre,telefono:normalizeTel(form.telefono),
           direccion:form.direccion,zona:form.zona,
           notas:form.notas,doctor:form.doctor,
-          lab_actual:form.labActual,resultado_visita:form.resultadoVisita,
-          wa_opt_in:form.waOptIn,tipo_accion:form.tipoAccion,
+          lab_actual:form.labActual,
+          resultado_visita:mode==="visite"?form.resultadoVisita:"",
+          estado_override:estadoFinal,
+          wa_opt_in:form.waOptIn,wa_numero:normalizeTel(form.waNumero),
+          tipo_accion:form.tipoAccion,
           proxima_accion:form.proximaAccion,clinica_digital:form.clinicaDigital,
           objecion:form.objecion,vendedor:CONFIG_USER.name,
           id_vendedor:CONFIG_USER.id,
+          es_visita:mode==="visite",
         })
       });
-      onToast("✅ Clínica guardada en Sheet","success");
+      onToast(mode==="visite"?"✅ Visita registrada en Sheet":"✅ Clínica guardada en Sheet","success");
     }catch(e){onToast("✅ Clínica agregada","success");}
 
     setForm({nombre:"",telefono:"",direccion:"",zona:"",notas:"",doctor:"",labActual:"",resultadoVisita:"",objecion:"",clinicaDigital:"",waOptIn:false,tipoAccion:"",proximaAccion:""});
