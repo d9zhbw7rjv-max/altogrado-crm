@@ -814,6 +814,7 @@ function NuevaClinica({onToast,addNotif,prospectos}){
 
   const handleSave=async(andCall=false)=>{
     if(!form.nombre||!form.telefono){onToast("⚠️ Nombre y teléfono requeridos","error");return;}
+    if(mode==="visite"&&(!form.proximaAccion||!form.tipoAccion)){onToast("⚠️ Próxima acción: tipo y fecha requeridos","error");return;}
 
     // Map resultado_visita to correct ESTADO
     const estadoMap = {
@@ -1398,6 +1399,7 @@ function AppMain({session,onLogout}){
           tipoAccion:   row[33]||"",
           esCliente:    row[37]||"",
           seguimiento:  row[41]==="YES"||row[41]==="TRUE",
+          tipoTrabajo:  row[43]||"",  // col AR
           fechaCompromiso:row[42]||"",
           score:        parseFloat(row[12])||0,
           objecion:     "",
