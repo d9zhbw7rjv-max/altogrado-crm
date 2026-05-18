@@ -243,9 +243,13 @@ function ProspectoModal({p,onClose,onUpdate,onToast,plan,addNotif}){
             tipo_accion:form.tipoAccion,
             fecha_compromiso:form.fechaCompromiso,
             telefono_update:normalizeTel(form.telefonoUpdate||""),
+            estado_update:form.estadoUpdate||"",
           })
         });
-        if(form.telefonoUpdate) onUpdate(p.id,{telefono:normalizeTel(form.telefonoUpdate)});
+        const upd = {};
+        if(form.telefonoUpdate) upd.telefono = normalizeTel(form.telefonoUpdate);
+        if(form.estadoUpdate) upd.estado = form.estadoUpdate;
+        if(Object.keys(upd).length) onUpdate(p.id, upd);
         onToast("✅ Seguimiento guardado","success");
       } catch(e){ onToast("✅ Guardado localmente","info"); }
       onClose();
@@ -469,6 +473,20 @@ function ProspectoModal({p,onClose,onUpdate,onToast,plan,addNotif}){
                 <div><label style={lbl}>Actualizar Teléfono</label>
                   <input type="tel" placeholder="52XXXXXXXXXX" value={form.telefonoUpdate||""} onChange={e=>setForm(f=>({...f,telefonoUpdate:e.target.value}))} style={inp}/>
                 </div>
+                <div><label style={lbl}>Actualizar Estado</label>
+                  <select value={form.estadoUpdate||""} onChange={e=>setForm(f=>({...f,estadoUpdate:e.target.value}))} style={inp}>
+                    <option value="">Sin cambio...</option>
+                    <option value="VISITADO_INTERESADO">✅ Visitado Interesado</option>
+                    <option value="CITA_AGENDADA">📅 Cita Agendada</option>
+                    <option value="CALLBACK_SOLICITADO">📞 Callback Solicitado</option>
+                    <option value="PRIMER_PEDIDO">🎉 Primer Pedido</option>
+                    <option value="CLIENTE_ACTIVO">⭐ Cliente Activo</option>
+                    <option value="CLIENTE_REACTIVAR">🔄 Reactivar</option>
+                    <option value="CLIENTE_PERDIDO">😔 Cliente Perdido</option>
+                    <option value="VISITADO_NO_INTERESADO">❌ No Interesado</option>
+                    <option value="DESCARTADO">🗑️ Descartado</option>
+                  </select>
+                </div>
                 <div style={{background:"#EDE9FE",borderRadius:12,padding:"12px 14px",border:"1.5px solid #DDD6FE"}}>
                   <div style={{fontSize:13,fontWeight:700,color:"#7C3AED",marginBottom:10}}>📅 Agendar Cita</div>
                   <div style={{display:"flex",gap:8,marginBottom:8}}>
@@ -661,14 +679,24 @@ function MapaDelDia({prospectos,onSelect,onToast,addNotif,plan}){
 function ListaDelDia({prospectos,onSelect,vendorId}){
   const [search,setSearch]=useState("");
   const [filter,setFilter]=useState("TODOS");
-  const QUICK=["TODOS","NUEVO","CITA_AGENDADA","VISITADO_INTERESADO","LLAMADA_PENDIENTE","DAR_SEGUIMIENTO","PRIMER_PEDIDO","CLIENTE_ACTIVO"];
+  const QUICK=["TODOS","NUEVO","CITA_AGENDADA","DAR_SEGUIMIENTO","PRIMER_PEDIDO","CLIENTE","DESCARTADO"];
 
-  const DAR_SEGUIMIENTO_ESTADOS=["CALLBACK_SOLICITADO","EN_ZONA","VISITADO_INTERESADO","TRANSFERIDO_TECNICO","CLIENTE_REACTIVAR"];
+  const DAR_SEGUIMIENTO_ESTADOS=["CALLBACK_SOLICITADO","EN_ZONA","VISITADO_INTERESADO","LLAMADA_PENDIENTE","TRANSFERIDO_TECNICO","CLIENTE_REACTIVAR"];
+  const CLIENTE_ESTADOS=["CLIENTE_ACTIVO"];
+  const DESCARTADO_ESTADOS=["DESCARTADO","CLIENTE_PERDIDO"];
+
+  const QUICK_LABELS={"TODOS":"Todos","NUEVO":"Nuevo","CITA_AGENDADA":"Cita Agendada","DAR_SEGUIMIENTO":"Dar Seguimiento","PRIMER_PEDIDO":"Primer Pedido","CLIENTE":"Cliente","DESCARTADO":"Descartado"};
 
   const filtered=prospectos
-    .filter(p=>p.estado!=="DESCARTADO"&&(vendorId?p.vendedor_id===vendorId||p.id_vendedor===vendorId:true))
+    .filter(p=>(filter==="DESCARTADO"||p.estado!=="DESCARTADO"&&p.estado!=="CLIENTE_PERDIDO")&&(vendorId?p.vendedor_id===vendorId||p.id_vendedor===vendorId:true))
     .filter(p=>!search||p.nombre.toLowerCase().includes(search.toLowerCase())||p.zona.toLowerCase().includes(search.toLowerCase()))
-    .filter(p=>filter==="TODOS"||(filter==="DAR_SEGUIMIENTO"?["CALLBACK_SOLICITADO","EN_ZONA","VISITADO_INTERESADO","TRANSFERIDO_TECNICO"].includes(p.estado):p.estado===filter))
+    .filter(p=>{
+      if(filter==="TODOS") return true;
+      if(filter==="DAR_SEGUIMIENTO") return ["CALLBACK_SOLICITADO","EN_ZONA","VISITADO_INTERESADO","LLAMADA_PENDIENTE","TRANSFERIDO_TECNICO","CLIENTE_REACTIVAR"].includes(p.estado);
+      if(filter==="CLIENTE") return p.estado==="CLIENTE_ACTIVO";
+      if(filter==="DESCARTADO") return ["DESCARTADO","CLIENTE_PERDIDO"].includes(p.estado);
+      return p.estado===filter;
+    })
     .sort((a,b)=>b.score-a.score);
   return(
     <div style={{height:"100%",display:"flex",flexDirection:"column"}}>
@@ -682,7 +710,7 @@ function ListaDelDia({prospectos,onSelect,vendorId}){
         {QUICK.map(f=>{
           const c=ESTADO_CONFIG[f];
           return <button key={f} onClick={()=>setFilter(f)} style={{padding:"6px 12px",borderRadius:20,border:`1.5px solid ${filter===f?(c?.color||"#0EA5E9"):"#E2E8F0"}`,background:filter===f?(c?.bg||"#EFF6FF"):"white",fontSize:11,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap",color:filter===f?(c?.color||"#0EA5E9"):"#94A3B8"}}>
-            {c?.label||"Todos"}
+            {QUICK_LABELS[f]||c?.label||f}
           </button>;
         })}
       </div>
@@ -712,7 +740,7 @@ function ListaDelDia({prospectos,onSelect,vendorId}){
 
 // ── VIEW: CHECKLIST ─────────────────────────────────────────────
 function Checklist({prospectos,onSelect,onUpdate,onToast,vendorId}){
-  const DAR_SEG=["CALLBACK_SOLICITADO","EN_ZONA","VISITADO_INTERESADO","TRANSFERIDO_TECNICO"];
+  const DAR_SEG=["CALLBACK_SOLICITADO","EN_ZONA","VISITADO_INTERESADO","LLAMADA_PENDIENTE","TRANSFERIDO_TECNICO","CLIENTE_REACTIVAR"];
   const pend=prospectos.filter(p=>DAR_SEG.includes(p.estado)&&!p.seguimiento&&(p.vendedor_id===CONFIG_USER.id||p.id_vendedor===CONFIG_USER.id)).sort((a,b)=>new Date(a.proximaAccion||"9999")-new Date(b.proximaAccion||"9999"));
   return(
     <div style={{height:"100%",display:"flex",flexDirection:"column"}}>
