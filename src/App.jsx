@@ -6,7 +6,7 @@ const CONFIG = {
   MAPS_KEY: import.meta.env.VITE_MAPS_KEY || "",
   MAKE_WEBHOOK_E5: "https://hook.us2.make.com/jyfj767nmqfnpj7uk8srlyvudficta7x",
   MAKE_WEBHOOK_RESULT: "https://hook.eu1.make.com/YOUR_RESULTADO_URL",
-  MAKE_WEBHOOK_E7: " https://hook.us2.make.com/aodn54hswhl3cyvynkto3f5hbhwaftna",
+  MAKE_WEBHOOK_E7: "https://hook.us2.make.com/aodn54hswhl3cyvynkto3f5hbhwaftna",
 };
 
 // Session stored in memory — resets on app close
@@ -292,6 +292,36 @@ function ProspectoModal({p,onClose,onUpdate,onToast,plan,addNotif}){
   const inp={width:"100%",padding:"10px 12px",border:"1.5px solid #E2E8F0",borderRadius:10,fontSize:14,outline:"none",boxSizing:"border-box"};
   const lbl={fontSize:12,color:"#64748B",marginBottom:4,display:"block",fontWeight:600};
 
+  const saveAgendarCita = async() => {
+    if(!form.fechaCita||!form.horaCita){ onToast("⚠️ Selecciona fecha y hora","error"); return; }
+    try {
+      await fetch(CONFIG.MAKE_WEBHOOK_E7,{
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+          accion: "book_appointments_cal",
+          id_prospecto: p.id,
+          id_vendedor: CONFIG_USER.id,
+          nombre_doctor: p.doctor||p.nombre,
+          nombre_clinica: p.nombre,
+          telefono: p.telefono,
+          direccion: p.direccion,
+          fecha_cita: form.fechaCita,
+          hora_cita: form.horaCita,
+          duracion_minutos: "30",
+          vendedor: CONFIG_USER.name,
+        })
+      });
+      onUpdate(p.id, {
+        estado:"CITA_AGENDADA",
+        proximaAccion: form.fechaCita,
+        horaCita: form.horaCita,
+        seguimiento: false,
+      });
+      onToast("📅 Cita agendada en Google Calendar","success");
+      onClose();
+    } catch(e){ onToast("Error al agendar cita","error"); }
+  };
+
   const savePrimerPedido = async() => {
     const today = new Date().toISOString().split("T")[0];
     try {
@@ -438,6 +468,16 @@ function ProspectoModal({p,onClose,onUpdate,onToast,plan,addNotif}){
                 </div>
                 <div><label style={lbl}>Actualizar Teléfono</label>
                   <input type="tel" placeholder="52XXXXXXXXXX" value={form.telefonoUpdate||""} onChange={e=>setForm(f=>({...f,telefonoUpdate:e.target.value}))} style={inp}/>
+                </div>
+                <div style={{background:"#EDE9FE",borderRadius:12,padding:"12px 14px",border:"1.5px solid #DDD6FE"}}>
+                  <div style={{fontSize:13,fontWeight:700,color:"#7C3AED",marginBottom:10}}>📅 Agendar Cita</div>
+                  <div style={{display:"flex",gap:8,marginBottom:8}}>
+                    <input type="date" value={form.fechaCita||""} onChange={e=>setForm(f=>({...f,fechaCita:e.target.value}))} style={{...inp,flex:1}} placeholder="Fecha"/>
+                    <input type="time" value={form.horaCita||""} onChange={e=>setForm(f=>({...f,horaCita:e.target.value}))} style={{...inp,flex:1}} placeholder="Hora"/>
+                  </div>
+                  <button onClick={saveAgendarCita} disabled={!form.fechaCita||!form.horaCita} style={{width:"100%",padding:"10px",background:form.fechaCita&&form.horaCita?"#7C3AED":"#C4B5FD",color:"white",border:"none",borderRadius:10,fontSize:13,fontWeight:700,cursor:form.fechaCita&&form.horaCita?"pointer":"not-allowed"}}>
+                    📅 Confirmar Cita en Calendario
+                  </button>
                 </div>
                 <button onClick={save} style={{width:"100%",padding:"14px",background:"linear-gradient(135deg,#10B981,#0EA5E9)",color:"white",border:"none",borderRadius:12,fontSize:15,fontWeight:700,cursor:"pointer",marginBottom:8}}>Guardar Seguimiento</button>
                 <button onClick={()=>savePrimerPedido()} style={{width:"100%",padding:"14px",background:"linear-gradient(135deg,#EC4899,#F97316)",color:"white",border:"none",borderRadius:12,fontSize:15,fontWeight:700,cursor:"pointer"}}>🎉 Registrar Primer Pedido</button>
