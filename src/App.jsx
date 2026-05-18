@@ -6,7 +6,7 @@ const CONFIG = {
   MAPS_KEY: import.meta.env.VITE_MAPS_KEY || "",
   MAKE_WEBHOOK_E5: "https://hook.us2.make.com/jyfj767nmqfnpj7uk8srlyvudficta7x",
   MAKE_WEBHOOK_RESULT: "https://hook.eu1.make.com/YOUR_RESULTADO_URL",
-  MAKE_WEBHOOK_E7: "https://hook.us2.make.com/aodn54hswhl3cyvynkto3f5hbhwaftna",
+  MAKE_WEBHOOK_E7: " https://hook.us2.make.com/aodn54hswhl3cyvynkto3f5hbhwaftna",
 };
 
 // Session stored in memory — resets on app close
@@ -14,12 +14,15 @@ let SESSION = JSON.parse(sessionStorage.getItem("ag_session") || "null");
 // Global user config - updated on login
 let CONFIG_USER = SESSION ? { id: SESSION.id_vendedor, name: SESSION.nombre, email: SESSION.email } : { id: "", name: "", email: "" };
 
-const ZONAS_LIST = ['ANZURES','AZCAPOTZALCO','BENITO JUAREZ','CENTRO','CLAVERIA',
-  'CONDESA Y ROMA','COPILCO UNIVERSIDAD','COYOACAN','CUAUHTEMOC','DEL VALLE',
-  'GRANADA','GUSTAVO A MADERO','IZTAPALAPA','LOMAS DE CHAPULTEPEC','LOMAS VERDES',
-  'NAPOLES','NARVARTE','NAUCALPAN','PEDREGAL','POLANCO','POPOTLA',
-  'SAN MIGUEL CHAPULTEPEC','SAN RAFAEL','SANTA FE','SATELITE','TLALPAN',
-  'TLANEPANTLA','TLATELOLCO','VILLA COAPA','PACHUCA','ECATEPEC','XOCHIMILCO','IZTACALCO'];
+const ZONAS_LIST = [
+  'ANZURES','AZCAPOTZALCO','CENTRO','CLAVERIA','COL ESTRELLA',
+  'COL GUADALUPE TEPEYAC','COL LINDAVISTA','CONDESA Y ROMA','COPILCO UNIVERSIDAD',
+  'COYOACAN','CUAUHTEMOC','DEL VALLE','ECATEPEC','GRANADA','GUADALUPE TEPEYAC',
+  'GUSTAVO A MADERO','IZTACALCO','IZTAPALAPA','LOMAS DE CHAPULTEPEC','LOMAS VERDES',
+  'NAPOLES','NARVARTE','NAUCALPAN','ORIENTE','PACHUCA','PEDREGAL','POLANCO','POPOTLA',
+  'SAN MARTIN','SAN MIGUEL CHAPULTEPEC','SAN RAFAEL','SANTA FE','SATELITE',
+  'TLALPAN','TLANEPANTLA','TLATELOLCO','VILLA COAPA','XOCHIMILCO',
+];
 
 const ESTADO_CONFIG = {
   NUEVO:{color:"#94A3B8",bg:"#F8FAFC",label:"Nuevo"},
@@ -34,6 +37,10 @@ const ESTADO_CONFIG = {
   VISITADO_NO_INTERESADO:{color:"#6B7280",bg:"#F3F4F6",label:"No Interesado"},
   PRIMER_PEDIDO:{color:"#EC4899",bg:"#FCE7F3",label:"Primer Pedido"},
   CLIENTE_ACTIVO:{color:"#059669",bg:"#D1FAE5",label:"Cliente"},
+  TRANSFERIDO_TECNICO:{color:"#0891B2",bg:"#ECFEFF",label:"Transferido"},
+  CLIENTE_REACTIVAR:{color:"#F59E0B",bg:"#FFFBEB",label:"Reactivar"},
+  CLIENTE_PERDIDO:{color:"#6B7280",bg:"#F3F4F6",label:"Perdido"},
+  TEL_INVALIDO:{color:"#EF4444",bg:"#FEF2F2",label:"Tel Inválido"},
   DESCARTADO:{color:"#DC2626",bg:"#FEF2F2",label:"Descartado"},
 };
 
@@ -222,6 +229,29 @@ function ProspectoModal({p,onClose,onUpdate,onToast,plan,addNotif}){
   });
 
   const save=async()=>{
+    if(tab==="seguimiento"){
+      // Guardar seguimiento
+      try {
+        await fetch(CONFIG.MAKE_WEBHOOK_E7,{
+          method:"POST", headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({
+            accion:"completar_seguimiento",
+            id_prospecto:p.id,
+            id_vendedor:CONFIG_USER.id,
+            vendedor:CONFIG_USER.name,
+            proxima_accion:form.proximaAccion,
+            tipo_accion:form.tipoAccion,
+            fecha_compromiso:form.fechaCompromiso,
+            telefono_update:normalizeTel(form.telefonoUpdate||""),
+          })
+        });
+        if(form.telefonoUpdate) onUpdate(p.id,{telefono:normalizeTel(form.telefonoUpdate)});
+        onToast("✅ Seguimiento guardado","success");
+      } catch(e){ onToast("✅ Guardado localmente","info"); }
+      onClose();
+      return;
+    }
+    // Registrar visita
     const updates={
       resultadoVisita:form.resultadoVisita,notas:form.notas,
       labActual:form.labActual,objecion:form.objecion,
@@ -262,6 +292,25 @@ function ProspectoModal({p,onClose,onUpdate,onToast,plan,addNotif}){
   const inp={width:"100%",padding:"10px 12px",border:"1.5px solid #E2E8F0",borderRadius:10,fontSize:14,outline:"none",boxSizing:"border-box"};
   const lbl={fontSize:12,color:"#64748B",marginBottom:4,display:"block",fontWeight:600};
 
+  const savePrimerPedido = async() => {
+    const today = new Date().toISOString().split("T")[0];
+    try {
+      await fetch(CONFIG.MAKE_WEBHOOK_E7, {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+          accion: "primer_pedido",
+          id_prospecto: p.id,
+          id_vendedor: CONFIG_USER.id,
+          vendedor: CONFIG_USER.name,
+          fecha_primer_pedido: today,
+        })
+      });
+      onUpdate(p.id, {estado:"PRIMER_PEDIDO", esCliente:true});
+      onToast("🎉 Primer pedido registrado — ¡cliente nuevo!","success");
+      onClose();
+    } catch(e) { onToast("Error al registrar primer pedido","error"); }
+  };
+
   return(
     <>
       <div style={{position:"fixed",inset:0,backgroundColor:"rgba(0,0,0,0.6)",zIndex:1000,display:"flex",alignItems:"flex-end"}} onClick={onClose}>
@@ -298,7 +347,10 @@ function ProspectoModal({p,onClose,onUpdate,onToast,plan,addNotif}){
           <div style={{flex:1,overflowY:"auto",padding:20}}>
             {tab==="info"&&(
               <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                {[["📞","Teléfono",p.telefono],["📧","Email",p.email||"—"],["📍","Dirección",p.direccion],["🏥","Lab actual",p.labActual||"—"],["👤","Doctor",p.doctor||"—"],["🔄","Intentos",p.intentos||0],["📝","Notas",[(p.ult_resultado?"📞 "+p.ult_resultado:""),(p.notas?"📋 "+p.notas:"")].filter(Boolean).join(" | ")||"—"]].map(([icon,label,value])=>(
+                {[["📞","Teléfono",p.telefono],["📧","Email",p.email||"—"],["📍","Dirección",p.direccion],["🏥","Lab actual",p.labActual||"—"],["👤","Doctor",p.doctor||"—"],["🔄","Intentos",p.intentos||0],["📝","Notas",[(p.ult_resultado?"📞 "+p.ult_resultado:""),(p.notas?"📋 "+p.notas:"")].filter(Boolean).join(" | ")||"—"],
+                 ["📅","1er Pedido",p.fechaPrimerPedido||"—"],
+                 ["🔄","Últ. Pedido",p.fechaUltimoPedido||"—"],
+                 ["💰","Facturación",p.facturacion?("$"+Number(p.facturacion).toLocaleString("es-MX")):"—"]].map(([icon,label,value])=>(
                   <div key={label} style={{padding:"10px 14px",background:"#F8FAFC",borderRadius:10}}>
                     <div style={{fontSize:11,color:"#94A3B8",marginBottom:2}}>{icon} {label}</div>
                     <div style={{fontSize:14,color:"#0F172A",wordBreak:"break-word"}}>{value}</div>
@@ -384,7 +436,11 @@ function ProspectoModal({p,onClose,onUpdate,onToast,plan,addNotif}){
                 <div><label style={lbl}>Fecha compromiso del doctor</label>
                   <input type="date" value={form.fechaCompromiso} onChange={e=>setForm(f=>({...f,fechaCompromiso:e.target.value}))} style={inp}/>
                 </div>
-                <button onClick={save} style={{width:"100%",padding:"14px",background:"linear-gradient(135deg,#10B981,#0EA5E9)",color:"white",border:"none",borderRadius:12,fontSize:15,fontWeight:700,cursor:"pointer"}}>Guardar Seguimiento</button>
+                <div><label style={lbl}>Actualizar Teléfono</label>
+                  <input type="tel" placeholder="52XXXXXXXXXX" value={form.telefonoUpdate||""} onChange={e=>setForm(f=>({...f,telefonoUpdate:e.target.value}))} style={inp}/>
+                </div>
+                <button onClick={save} style={{width:"100%",padding:"14px",background:"linear-gradient(135deg,#10B981,#0EA5E9)",color:"white",border:"none",borderRadius:12,fontSize:15,fontWeight:700,cursor:"pointer",marginBottom:8}}>Guardar Seguimiento</button>
+                <button onClick={()=>savePrimerPedido()} style={{width:"100%",padding:"14px",background:"linear-gradient(135deg,#EC4899,#F97316)",color:"white",border:"none",borderRadius:12,fontSize:15,fontWeight:700,cursor:"pointer"}}>🎉 Registrar Primer Pedido</button>
               </div>
             )}
           </div>
@@ -567,7 +623,7 @@ function ListaDelDia({prospectos,onSelect,vendorId}){
   const [filter,setFilter]=useState("TODOS");
   const QUICK=["TODOS","NUEVO","CITA_AGENDADA","VISITADO_INTERESADO","LLAMADA_PENDIENTE","DAR_SEGUIMIENTO","PRIMER_PEDIDO","CLIENTE_ACTIVO"];
 
-  const DAR_SEGUIMIENTO_ESTADOS=["CALLBACK_SOLICITADO","EN_ZONA","VISITADO_INTERESADO","TRANSFERIDO_TECNICO"];
+  const DAR_SEGUIMIENTO_ESTADOS=["CALLBACK_SOLICITADO","EN_ZONA","VISITADO_INTERESADO","TRANSFERIDO_TECNICO","CLIENTE_REACTIVAR"];
 
   const filtered=prospectos
     .filter(p=>p.estado!=="DESCARTADO"&&(vendorId?p.vendedor_id===vendorId||p.id_vendedor===vendorId:true))
@@ -812,7 +868,7 @@ function NuevaClinica({onToast,addNotif,prospectos}){
   const inp={width:"100%",padding:"10px 12px",border:"1.5px solid #E2E8F0",borderRadius:10,fontSize:14,outline:"none",boxSizing:"border-box"};
   const lbl={fontSize:12,color:"#64748B",marginBottom:4,display:"block",fontWeight:600};
 
-  const handleSave=async(andCall=false)=>{
+  const handleSave=async(andCall=false, isPrimerPedido=false)=>{
     if(!form.nombre||!form.telefono){onToast("⚠️ Nombre y teléfono requeridos","error");return;}
     if(mode==="visite"&&(!form.proximaAccion||!form.tipoAccion)){onToast("⚠️ Próxima acción: tipo y fecha requeridos","error");return;}
 
@@ -846,6 +902,12 @@ function NuevaClinica({onToast,addNotif,prospectos}){
         })
       });
       onToast(mode==="visite"?"✅ Visita registrada en Sheet":"✅ Clínica guardada en Sheet","success");
+      if(isPrimerPedido){
+        const today=new Date().toISOString().split("T")[0];
+        await fetch(CONFIG.MAKE_WEBHOOK_E7,{method:"POST",headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({accion:"primer_pedido",id_prospecto:"NUEVO-"+Date.now(),id_vendedor:CONFIG_USER.id,vendedor:CONFIG_USER.name,fecha_primer_pedido:today})});
+        onToast("🎉 Primer pedido registrado","success");
+      }
     }catch(e){onToast("✅ Clínica agregada","success");}
 
     setForm({nombre:"",telefono:"",direccion:"",zona:"",notas:"",doctor:"",labActual:"",resultadoVisita:"",objecion:"",clinicaDigital:"",waOptIn:false,tipoAccion:"",proximaAccion:""});
@@ -1255,7 +1317,7 @@ function LoginScreen({onLogin}){
   const [error,setError]=useState("");
   const [loading,setLoading]=useState(false);
 
-  const VENDEDORES_IDS = ["VEND-001","VEND-002","VEND-003","VEND-004"];
+  const VENDEDORES_IDS = ["VEND-001","VEND-002","VEND-003","VEND-004","VEND-005"];
 
   const handleLogin=async()=>{
     if(!idVendedor||!pin){setError("Completa todos los campos");return;}
@@ -1400,6 +1462,9 @@ function AppMain({session,onLogout}){
           esCliente:    row[37]||"",
           seguimiento:  row[41]==="YES"||row[41]==="TRUE",
           tipoTrabajo:  row[39]||"",  // col AN
+          fechaPrimerPedido: row[26]||"",  // col AA
+          fechaUltimoPedido: row[27]||"",  // col AB
+          facturacion:  row[28]||"",  // col AC
           fechaCompromiso:row[42]||"",
           score:        parseFloat(row[12])||0,
           objecion:     "",
@@ -1584,7 +1649,7 @@ function AppMain({session,onLogout}){
         {view==="checklist"&&<Checklist prospectos={prospectos} onSelect={setSelected} onUpdate={updateP} onToast={showToast} vendorId={CONFIG_USER.id}/>}
         {view==="plan"&&<PlanSemanal prospectos={prospectos} onToast={showToast} plan={plan} setPlan={setPlan}/>}
         {view==="nueva"&&<NuevaClinica onToast={showToast} addNotif={addNotif} prospectos={prospectos}/>}
-        {view==="dashboard"&&(["VEND-002","VEND-004"].includes(CONFIG_USER.id)?
+        {view==="dashboard"&&(["VEND-002","VEND-004","VEND-005"].includes(CONFIG_USER.id)?
           <DashboardGerencia prospectos={prospectos}/>:
           <DashboardVendedor prospectos={prospectos}/>
         )}
