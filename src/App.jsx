@@ -1143,6 +1143,8 @@ function DashboardGerencia({prospectos}){
     {id:"VEND-001",name:"Areli"},
     {id:"VEND-003",name:"Daniela"},
     {id:"VEND-002",name:"Ivan"},
+    {id:"VEND-004",name:"NPMC"},
+    {id:"VEND-005",name:"AGLD"},
   ];
 
   const filtrados=embFiltro==="total"?prospectos:prospectos.filter(p=>p.id_vendedor===embFiltro||p.vendedor_id===embFiltro);
@@ -1198,7 +1200,9 @@ function DashboardGerencia({prospectos}){
   };
 
   const calcG=(curr,prev)=>{
-    if(!prev)return curr>0?"+inf":"–";
+    if(curr===0&&prev===0)return "–";
+    if(curr===0)return "–";
+    if(!prev||prev===0)return "nuevo";
     const g=Math.round(((curr-prev)/prev)*100);
     return(g>=0?"+":"")+g+"%";
   };
@@ -1303,8 +1307,8 @@ function DashboardGerencia({prospectos}){
                       <td style={{padding:"7px 4px",fontWeight:m===thisMonth?700:400,color:"#0F172A"}}>{label}{m===thisMonth?" ◀":""}</td>
                       <td style={{textAlign:"right",padding:"7px 4px",fontWeight:700,color:"#0F172A"}}>{curr}</td>
                       {vends.map(v=><td key={v.id} style={{textAlign:"right",padding:"7px 4px",color:"#475569"}}>{getCountMes(v.id,m,thisYear)}</td>)}
-                      <td style={{textAlign:"right",padding:"7px 4px",fontWeight:600,color:gM.startsWith("+")?("#10B981"):gM==="–"?"#94A3B8":"#EF4444"}}>{gM}</td>
-                      <td style={{textAlign:"right",padding:"7px 4px",fontWeight:600,color:gY.startsWith("+")?("#10B981"):gY==="–"?"#94A3B8":"#EF4444"}}>{gY}</td>
+                      <td style={{textAlign:"right",padding:"7px 4px",fontWeight:600,color:gM.startsWith("+")||gM==="nuevo"?"#10B981":gM==="–"?"#94A3B8":"#EF4444"}}>{gM}</td>
+                      <td style={{textAlign:"right",padding:"7px 4px",fontWeight:600,color:gY.startsWith("+")||gY==="nuevo"?"#10B981":gY==="–"?"#94A3B8":"#EF4444"}}>{gY}</td>
                     </tr>
                   );
                 })}
