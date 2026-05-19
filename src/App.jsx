@@ -1129,256 +1129,293 @@ function NuevaClinica({onToast,addNotif,prospectos}){
 function DashboardGerencia({prospectos}){
   const now = new Date();
   const thisYear = now.getFullYear();
-  const thisMonth = now.getMonth(); // 0-indexed
+  const thisMonth = now.getMonth();
+  const today = now.toISOString().split('T')[0];
+  const weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay() + 1);
+  const weekStartStr = weekStart.toISOString().split('T')[0];
 
-  const MESES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
-  const ESTADOS_EMBUDO = [
-    {key:"NUEVO", label:"Nuevos"},
-    {key:"LLAMADA_PENDIENTE", label:"Contactados"},
-    {key:"CITA_AGENDADA", label:"Cita Agendada"},
-    {key:"VISITADO_INTERESADO", label:"Visitado Interesado"},
-    {key:"PRIMER_PEDIDO", label:"Primer Pedido"},
-    {key:"CLIENTE_ACTIVO", label:"Cliente Activo"},
+  const [embFiltro, setEmbFiltro] = React.useState('total'); // 'total' | 'VEND-001' etc.
+  const [tab, setTab] = React.useState('semanal'); // 'semanal' | 'mensual'
+
+  const VENDEDORES_DASH = [
+    {id:'total', name:'Todos'},
+    {id:'VEND-001', name:'Areli'},
+    {id:'VEND-003', name:'Daniela'},
+    {id:'VEND-002', name:'Ivan'},
   ];
 
-  // Get count by estado, month, year
-  const getCount = (estado, month, year) => {
-    return prospectos.filter(p => {
-      if(p.estado !== estado) return false;
-      const dateStr = p.ultimoContacto || p.fechaCreacion || "";
-      if(!dateStr) return false;
-      const d = new Date(dateStr + "T12:00:00");
-      return d.getFullYear() === year && d.getMonth() === month;
+  const filtrados = embFiltro === 'total'
+    ? prospectos
+    : prospectos.filter(p => p.id_vendedor === embFiltro || p.vendedor_id === embFiltro);
+
+  const ESTADOS_EMBUDO = [
+    {key:'NUEVO', label:'Nuevos', color:'#94A3B8'},
+    {key:'VISITADO_INTERESADO', label:'Interesados', color:'#3B82F6'},
+    {key:'CITA_AGENDADA', label:'Citas Agendadas', color:'#8B5CF6'},
+    {key:'PRIMER_PEDIDO', label:'Primer Pedido', color:'#EC4899'},
+    {key:'CLIENTE_ACTIVO', label:'Clientes Activos', color:'#10B981'},
+    {key:'CLIENTE_REACTIVAR', label:'A Reactivar', color:'#F59E0B'},
+    {key:'DESCARTADO', label:'Descartados', color:'#EF4444'},
+    {key:'CLIENTE_PERDIDO', label:'Clientes Perdidos', color:'#6B7280'},
+  ];
+
+  const getEmbCount = (key) => filtrados.filter(p => p.estado === key).length;
+  const maxEmb = getEmbCount('NUEVO') || 1;
+
+  // Semana actual: métricas por vendedor
+  const vends = [
+    {id:'VEND-001', name:'Areli Rios'},
+    {id:'VEND-003', name:'Daniela Rivera'},
+    {id:'VEND-002', name:'Ivan Jimenez'},
+  ];
+
+  const getMetricasSemana = (vendId) => {
+    const vp = prospectos.filter(p => p.id_vendedor === vendId || p.vendedor_id === vendId);
+    // Seguimientos: tienen proximaAccion >= weekStart y tipo = WHATSAPP/LLAMADA
+    const seguimientos = vp.filter(p =>
+      p.tipoAccion && (p.tipoAccion.includes('WHATSAPP') || p.tipoAccion.includes('LLAMADA')) &&
+      p.seguimiento === true
+    ).length;
+    // Visitas: fecha visita en esta semana
+    const visitas = vp.filter(p => p.fechaVisita >= weekStartStr).length;
+    // Primer Pedido: registros donde CUENTA_PRIMER_PEDIDO = 1 y fecha en semana
+    const primerPedido = vp.filter(p => p.cuentaPrimerPedido === '1' && p.fechaPrimerPedido >= weekStartStr).length;
+    // Descartados/Perdidos esta semana
+    const descartados = vp.filter(p =>
+      (p.estado === 'DESCARTADO' || p.estado === 'CLIENTE_PERDIDO') &&
+      p.ult_contacto >= weekStartStr
+    ).length;
+    const totalProspectos = vp.filter(p => !['DESCARTADO','CLIENTE_PERDIDO'].includes(p.estado)).length;
+    const clientes = vp.filter(p => p.estado === 'CLIENTE_ACTIVO' || p.estado === 'PRIMER_PEDIDO').length;
+    return {seguimientos, visitas, primerPedido, descartados, totalProspectos, clientes};
+  };
+
+  // Mensual
+  const months = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+    .map((label, m) => ({label, m}));
+
+  const getCountMes = (vendId, m, year) => {
+    const base = (vendId === 'total' ? prospectos : prospectos.filter(p => p.id_vendedor === vendId || p.vendedor_id === vendId));
+    return base.filter(p => {
+      if (p.cuentaPrimerPedido !== '1') return false;
+      const d = p.fechaPrimerPedido || '';
+      if (!d) return false;
+      const dd = new Date(d);
+      return dd.getMonth() === m && dd.getFullYear() === year;
     }).length;
   };
 
-  // Acumulado anual = total current estado regardless of date (snapshot)
-  const getTotal = (estado) => prospectos.filter(p => p.estado === estado).length;
-
-  // Build monthly data for current and last year
-  const months = [];
-  for(let m = 0; m <= thisMonth; m++){
-    months.push({month: m, label: MESES[m]});
-  }
-
-  // Calculate % growth vs last month and vs last year same month
-  const calcGrowth = (current, previous) => {
-    if(previous === 0) return current > 0 ? "+100%" : "-";
-    const pct = Math.round(((current - previous) / previous) * 100);
-    return (pct >= 0 ? "+" : "") + pct + "%";
+  const calcG = (curr, prev) => {
+    if (!prev) return curr > 0 ? '+∞' : '–';
+    const g = Math.round(((curr - prev) / prev) * 100);
+    return (g >= 0 ? '+' : '') + g + '%';
   };
 
-  const [selectedEstado, setSelectedEstado] = useState(ESTADOS_EMBUDO[2].key);
-  const [tab, setTab] = useState("mensual");
-
-  const selectedLabel = ESTADOS_EMBUDO.find(e=>e.key===selectedEstado)?.label || selectedEstado;
+  const card = {background:'white', borderRadius:12, padding:'14px 16px', marginBottom:14, boxShadow:'0 1px 4px rgba(0,0,0,0.07)'};
+  const metChip = (val, icon, label, color='#6366F1') => (
+    <div style={{flex:1, background:'#F8FAFC', borderRadius:10, padding:'10px 8px', textAlign:'center', border:'1px solid #E2E8F0'}}>
+      <div style={{fontSize:18, marginBottom:2}}>{icon}</div>
+      <div style={{fontSize:20, fontWeight:800, color}}>{val}</div>
+      <div style={{fontSize:9, color:'#94A3B8', marginTop:2, lineHeight:1.2}}>{label}</div>
+    </div>
+  );
 
   return(
-    <div style={{height:"100%",overflowY:"auto",background:"#F8FAFC",padding:"16px"}}>
-      <div style={{fontSize:18,fontWeight:800,color:"#0F172A",marginBottom:4}}>📊 Dashboard Gerencia</div>
-      <div style={{fontSize:12,color:"#64748B",marginBottom:16}}>Vista ejecutiva — {thisYear}</div>
+    <div style={{height:'100%', overflowY:'auto', background:'#F8FAFC', padding:'16px'}}>
+      <div style={{fontSize:18, fontWeight:800, color:'#0F172A', marginBottom:2}}>📊 Dashboard Gerencia</div>
+      <div style={{fontSize:11, color:'#64748B', marginBottom:16}}>Vista ejecutiva · {thisYear}</div>
 
-      {/* Embudo total actual */}
-      <div style={{background:"white",borderRadius:14,padding:16,marginBottom:16,boxShadow:"0 1px 4px rgba(0,0,0,0.08)"}}>
-        <div style={{fontSize:13,fontWeight:700,color:"#0F172A",marginBottom:12}}>Embudo Actual</div>
-        {ESTADOS_EMBUDO.map((e,i)=>{
-          const total = getTotal(e.key);
-          const maxTotal = getTotal(ESTADOS_EMBUDO[0].key) || 1;
-          const pct = Math.round((total/maxTotal)*100);
-          return(
-            <div key={e.key} style={{marginBottom:10,cursor:"pointer"}} onClick={()=>setSelectedEstado(e.key)}>
-              <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
-                <span style={{fontSize:12,color:selectedEstado===e.key?"#7C3AED":"#475569",fontWeight:selectedEstado===e.key?700:400}}>{e.label}</span>
-                <span style={{fontSize:12,fontWeight:700,color:"#0F172A"}}>{total.toLocaleString()}</span>
+      {/* Embudo con filtro por vendedor */}
+      <div style={card}>
+        <div style={{fontSize:13, fontWeight:700, color:'#0F172A', marginBottom:10}}>Embudo Actual</div>
+        {/* Filtro vendedor */}
+        <div style={{display:'flex', gap:6, marginBottom:12, flexWrap:'wrap'}}>
+          {VENDEDORES_DASH.map(v => (
+            <button key={v.id} onClick={() => setEmbFiltro(v.id)} style={{
+              padding:'4px 10px', borderRadius:20, border:'none', fontSize:11, fontWeight:600, cursor:'pointer',
+              background: embFiltro === v.id ? '#6366F1' : '#F1F5F9',
+              color: embFiltro === v.id ? 'white' : '#64748B',
+            }}>{v.name}</button>
+          ))}
+        </div>
+        {ESTADOS_EMBUDO.map(e => {
+          const count = getEmbCount(e.key);
+          const pct = Math.round((count / maxEmb) * 100);
+          return (
+            <div key={e.key} style={{marginBottom:8}}>
+              <div style={{display:'flex', justifyContent:'space-between', marginBottom:2}}>
+                <span style={{fontSize:11, color:'#475569'}}>{e.label}</span>
+                <span style={{fontSize:11, fontWeight:700, color:'#0F172A'}}>{count.toLocaleString()}</span>
               </div>
-              <div style={{height:8,background:"#F1F5F9",borderRadius:4,overflow:"hidden"}}>
-                <div style={{height:"100%",width:pct+"%",background:selectedEstado===e.key?"#7C3AED":"#3B82F6",borderRadius:4,transition:"width 0.3s"}}/>
+              <div style={{height:7, background:'#F1F5F9', borderRadius:4, overflow:'hidden'}}>
+                <div style={{height:'100%', width:pct+'%', background:e.color, borderRadius:4, transition:'width 0.3s'}}/>
               </div>
             </div>
           );
         })}
+        <div style={{marginTop:10, paddingTop:10, borderTop:'1px solid #F1F5F9', display:'flex', justifyContent:'space-between'}}>
+          <span style={{fontSize:11, color:'#64748B'}}>Total en embudo</span>
+          <span style={{fontSize:13, fontWeight:800, color:'#7C3AED'}}>{filtrados.length.toLocaleString()}</span>
+        </div>
       </div>
 
-      {/* Tabs mensual / vendedor */}
-      <div style={{display:"flex",background:"#F1F5F9",borderRadius:10,padding:3,marginBottom:12}}>
-        {["mensual","vendedor"].map(t=>(
-          <button key={t} onClick={()=>setTab(t)} style={{flex:1,padding:"8px",background:tab===t?"white":"transparent",border:"none",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",color:tab===t?"#0F172A":"#94A3B8"}}>
-            {t==="mensual"?"📅 Por Mes":"👤 Por Vendedor"}
-          </button>
+      {/* Tabs */}
+      <div style={{display:'flex', background:'#F1F5F9', borderRadius:10, padding:3, marginBottom:12}}>
+        {[['semanal','🗓️ Esta Semana'],['mensual','📅 Por Mes']].map(([t,l]) => (
+          <button key={t} onClick={() => setTab(t)} style={{flex:1, padding:'8px', background:tab===t?'white':'transparent', border:'none', borderRadius:8, fontSize:12, fontWeight:700, cursor:'pointer', color:tab===t?'#0F172A':'#94A3B8'}}>{l}</button>
         ))}
       </div>
 
-      {/* Tabla mensual */}
-      {tab==="mensual"&&(
-        <div style={{background:"white",borderRadius:14,padding:16,boxShadow:"0 1px 4px rgba(0,0,0,0.08)"}}>
-          <div style={{fontSize:13,fontWeight:700,color:"#0F172A",marginBottom:12}}>{selectedLabel} — Mensual {thisYear}</div>
-          <div style={{overflowX:"auto"}}>
-            <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+      {/* Tab Semanal — tabla por vendedor */}
+      {tab === 'semanal' && (
+        <div style={card}>
+          <div style={{fontSize:13, fontWeight:700, color:'#0F172A', marginBottom:12}}>Actividad de la Semana</div>
+          {vends.map(v => {
+            const m = getMetricasSemana(v.id);
+            return (
+              <div key={v.id} style={{marginBottom:14, paddingBottom:14, borderBottom:'1px solid #F1F5F9'}}>
+                <div style={{fontSize:12, fontWeight:700, color:'#374151', marginBottom:8}}>👤 {v.name}</div>
+                <div style={{display:'flex', gap:6}}>
+                  {metChip(m.seguimientos, '📞', 'Seguim.', '#6366F1')}
+                  {metChip(m.visitas, '🏥', 'Visitas', '#10B981')}
+                  {metChip(m.primerPedido, '🎉', '1er Pedido', '#EC4899')}
+                  {metChip(m.descartados, '🗑️', 'Descartados', '#EF4444')}
+                  {metChip(m.clientes, '⭐', 'Clientes', '#F59E0B')}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Tab Mensual */}
+      {tab === 'mensual' && (
+        <div style={card}>
+          <div style={{fontSize:13, fontWeight:700, color:'#0F172A', marginBottom:12}}>Primer Pedido — Mensual {thisYear}</div>
+          <div style={{overflowX:'auto'}}>
+            <table style={{width:'100%', borderCollapse:'collapse', fontSize:11}}>
               <thead>
-                <tr style={{borderBottom:"2px solid #E2E8F0"}}>
-                  <th style={{textAlign:"left",padding:"6px 4px",color:"#64748B"}}>Mes</th>
-                  <th style={{textAlign:"right",padding:"6px 4px",color:"#64748B"}}>Este año</th>
-                  <th style={{textAlign:"right",padding:"6px 4px",color:"#64748B"}}>Año ant.</th>
-                  <th style={{textAlign:"right",padding:"6px 4px",color:"#64748B"}}>vs mes ant.</th>
-                  <th style={{textAlign:"right",padding:"6px 4px",color:"#64748B"}}>vs año ant.</th>
+                <tr style={{borderBottom:'2px solid #E2E8F0'}}>
+                  <th style={{textAlign:'left', padding:'6px 4px', color:'#64748B'}}>Mes</th>
+                  <th style={{textAlign:'right', padding:'6px 4px', color:'#64748B'}}>Total</th>
+                  {vends.map(v => <th key={v.id} style={{textAlign:'right', padding:'6px 4px', color:'#64748B'}}>{v.name.split(' ')[0]}</th>)}
+                  <th style={{textAlign:'right', padding:'6px 4px', color:'#64748B'}}>vs mes ant.</th>
+                  <th style={{textAlign:'right', padding:'6px 4px', color:'#64748B'}}>vs año ant.</th>
                 </tr>
               </thead>
               <tbody>
-                {months.map(({month,label})=>{
-                  const curr = getCount(selectedEstado, month, thisYear);
-                  const prevMonth = month > 0 ? getCount(selectedEstado, month-1, thisYear) : 0;
-                  const prevYear = getCount(selectedEstado, month, thisYear-1);
-                  const gVsMes = calcGrowth(curr, prevMonth);
-                  const gVsAno = calcGrowth(curr, prevYear);
-                  const colorMes = gVsMes.startsWith("+") ? "#10B981" : gVsMes==="-" ? "#94A3B8" : "#EF4444";
-                  const colorAno = gVsAno.startsWith("+") ? "#10B981" : gVsAno==="-" ? "#94A3B8" : "#EF4444";
-                  return(
-                    <tr key={month} style={{borderBottom:"1px solid #F1F5F9",background:month===thisMonth?"#F5F3FF":"white"}}>
-                      <td style={{padding:"7px 4px",fontWeight:month===thisMonth?700:400,color:"#0F172A"}}>{label}{month===thisMonth?" ◀":""}</td>
-                      <td style={{textAlign:"right",padding:"7px 4px",fontWeight:700,color:"#0F172A"}}>{curr}</td>
-                      <td style={{textAlign:"right",padding:"7px 4px",color:"#64748B"}}>{prevYear}</td>
-                      <td style={{textAlign:"right",padding:"7px 4px",fontWeight:600,color:colorMes}}>{gVsMes}</td>
-                      <td style={{textAlign:"right",padding:"7px 4px",fontWeight:600,color:colorAno}}>{gVsAno}</td>
+                {months.map(({label, m}) => {
+                  const curr = getCountMes('total', m, thisYear);
+                  const prevM = m > 0 ? getCountMes('total', m-1, thisYear) : 0;
+                  const prevY = getCountMes('total', m, thisYear-1);
+                  const gM = calcG(curr, prevM);
+                  const gY = calcG(curr, prevY);
+                  return (
+                    <tr key={m} style={{borderBottom:'1px solid #F1F5F9', background:m===thisMonth?'#F5F3FF':'white'}}>
+                      <td style={{padding:'7px 4px', fontWeight:m===thisMonth?700:400, color:'#0F172A'}}>{label}{m===thisMonth?' ◀':''}</td>
+                      <td style={{textAlign:'right', padding:'7px 4px', fontWeight:700, color:'#0F172A'}}>{curr}</td>
+                      {vends.map(v => <td key={v.id} style={{textAlign:'right', padding:'7px 4px', color:'#475569'}}>{getCountMes(v.id, m, thisYear)}</td>)}
+                      <td style={{textAlign:'right', padding:'7px 4px', fontWeight:600, color:gM.startsWith('+')?'#10B981':gM==='–'?'#94A3B8':'#EF4444'}}>{gM}</td>
+                      <td style={{textAlign:'right', padding:'7px 4px', fontWeight:600, color:gY.startsWith('+')?'#10B981':gY==='–'?'#94A3B8':'#EF4444'}}>{gY}</td>
                     </tr>
                   );
                 })}
-                {/* Acumulado */}
-                <tr style={{borderTop:"2px solid #E2E8F0",background:"#F8FAFC"}}>
-                  <td style={{padding:"8px 4px",fontWeight:800,color:"#0F172A"}}>TOTAL</td>
-                  <td style={{textAlign:"right",padding:"8px 4px",fontWeight:800,color:"#7C3AED"}}>{getTotal(selectedEstado)}</td>
-                  <td style={{textAlign:"right",padding:"8px 4px",color:"#64748B"}}>
-                    {months.reduce((s,{month})=>s+getCount(selectedEstado,month,thisYear-1),0)}
-                  </td>
-                  <td colSpan={2} style={{textAlign:"right",padding:"8px 4px",fontWeight:700,color:"#10B981"}}>
-                    {calcGrowth(getTotal(selectedEstado), months.reduce((s,{month})=>s+getCount(selectedEstado,month,thisYear-1),0))}
-                  </td>
-                </tr>
               </tbody>
             </table>
           </div>
         </div>
       )}
-
-      {/* Tabla por vendedor */}
-      {tab==="vendedor"&&(
-        <div style={{background:"white",borderRadius:14,padding:16,boxShadow:"0 1px 4px rgba(0,0,0,0.08)"}}>
-          <div style={{fontSize:13,fontWeight:700,color:"#0F172A",marginBottom:12}}>Performance por Vendedor</div>
-          <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-            <thead>
-              <tr style={{borderBottom:"2px solid #E2E8F0"}}>
-                <th style={{textAlign:"left",padding:"6px 4px",color:"#64748B"}}>Vendedor</th>
-                {ESTADOS_EMBUDO.slice(2).map(e=>(
-                  <th key={e.key} style={{textAlign:"right",padding:"6px 4px",color:"#64748B"}}>{e.label.split(" ")[0]}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {[...new Set(prospectos.map(p=>p.vendedor).filter(Boolean))].map(vendedor=>(
-                <tr key={vendedor} style={{borderBottom:"1px solid #F1F5F9"}}>
-                  <td style={{padding:"7px 4px",fontWeight:600,color:"#0F172A",maxWidth:80,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{vendedor.split(" ")[0]}</td>
-                  {ESTADOS_EMBUDO.slice(2).map(e=>(
-                    <td key={e.key} style={{textAlign:"right",padding:"7px 4px",color:"#0F172A"}}>
-                      {prospectos.filter(p=>p.vendedor===vendedor&&p.estado===e.key).length}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
     </div>
   );
 }
 
-
-// ── DASHBOARD VENDEDOR ──────────────────────────────────────────
 function DashboardVendedor({prospectos}){
-  const myProspectos = prospectos.filter(p=>
-    p.vendedor_id===CONFIG_USER.id||p.id_vendedor===CONFIG_USER.id||p.vendedor===CONFIG_USER.id
+  const myProspectos = prospectos.filter(p =>
+    p.vendedor_id === CONFIG_USER.id || p.id_vendedor === CONFIG_USER.id
   );
-  const today = new Date().toISOString().split("T")[0];
+
+  const now = new Date();
+  const today = now.toISOString().split('T')[0];
+  const weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay() + 1);
+  const weekStartStr = weekStart.toISOString().split('T')[0];
+
+  // Seguimientos: prospectos con tipoAccion = WHATSAPP o LLAMADA y seguimiento completado hoy/semana
+  const segHoy = myProspectos.filter(p =>
+    p.tipoAccion && (p.tipoAccion.includes('WHATSAPP') || p.tipoAccion.includes('LLAMADA')) &&
+    p.ult_contacto === today
+  ).length;
+
+  const segSemana = myProspectos.filter(p =>
+    p.tipoAccion && (p.tipoAccion.includes('WHATSAPP') || p.tipoAccion.includes('LLAMADA')) &&
+    p.ult_contacto >= weekStartStr
+  ).length;
 
   const ESTADOS = [
-    {key:"NUEVO", label:"Nuevos", color:"#94A3B8"},
-    {key:"LLAMADA_PENDIENTE", label:"Contactados", color:"#8B5CF6"},
-    {key:"CALLBACK_SOLICITADO", label:"Callback", color:"#F59E0B"},
-    {key:"CITA_AGENDADA", label:"Citas", color:"#3B82F6"},
-    {key:"VISITADO_INTERESADO", label:"Interesados", color:"#10B981"},
-    {key:"PRIMER_PEDIDO", label:"1er Pedido", color:"#06B6D4"},
-    {key:"CLIENTE_ACTIVO", label:"Clientes", color:"#22C55E"},
+    {key:'NUEVO', label:'Nuevos', color:'#94A3B8'},
+    {key:'LLAMADA_PENDIENTE', label:'Llamada Pendiente', color:'#CBD5E1'},
+    {key:'CALLBACK_SOLICITADO', label:'Callback', color:'#A78BFA'},
+    {key:'EN_ZONA', label:'En Zona', color:'#60A5FA'},
+    {key:'VISITADO_INTERESADO', label:'Interesados', color:'#34D399'},
+    {key:'CITA_AGENDADA', label:'Citas Agendadas', color:'#8B5CF6'},
+    {key:'PRIMER_PEDIDO', label:'Primer Pedido', color:'#EC4899'},
+    {key:'CLIENTE_ACTIVO', label:'Clientes Activos', color:'#10B981'},
+    {key:'CLIENTE_REACTIVAR', label:'A Reactivar', color:'#F59E0B'},
   ];
 
-  const citasHoy = myProspectos.filter(p=>p.estado==="CITA_AGENDADA"&&p.proximaAccion===today);
-  const seguimientosPendientes = myProspectos.filter(p=>
-    ["VISITADO_INTERESADO","CALLBACK_SOLICITADO","TRANSFERIDO_TECNICO"].includes(p.estado)&&
-    !p.seguimiento&&p.proximaAccion&&p.proximaAccion<=today
-  );
+  const card = {background:'white', borderRadius:12, padding:'14px 16px', marginBottom:14, boxShadow:'0 1px 4px rgba(0,0,0,0.07)'};
 
   return(
-    <div style={{height:"100%",overflowY:"auto",background:"#F8FAFC",padding:"16px"}}>
-      <div style={{fontSize:18,fontWeight:800,color:"#0F172A",marginBottom:4}}>📊 Mi Dashboard</div>
-      <div style={{fontSize:12,color:"#64748B",marginBottom:16}}>{CONFIG_USER.name} · {new Date().toLocaleDateString("es-MX",{weekday:"long",day:"numeric",month:"long"})}</div>
+    <div style={{height:'100%', overflowY:'auto', background:'#F8FAFC', padding:'16px'}}>
+      <div style={{fontSize:18, fontWeight:800, color:'#0F172A', marginBottom:2}}>📊 Mi Dashboard</div>
+      <div style={{fontSize:11, color:'#64748B', marginBottom:16}}>
+        {CONFIG_USER.name} · {now.toLocaleDateString('es-MX', {weekday:'long', day:'numeric', month:'long'})}
+      </div>
 
-      {/* Alertas del día */}
-      {(citasHoy.length > 0 || seguimientosPendientes.length > 0) && (
-        <div style={{background:"#FFF7ED",border:"1.5px solid #FED7AA",borderRadius:12,padding:12,marginBottom:16}}>
-          <div style={{fontSize:13,fontWeight:700,color:"#C2410C",marginBottom:8}}>⚠️ Atención hoy</div>
-          {citasHoy.length > 0 && (
-            <div style={{fontSize:12,color:"#9A3412",marginBottom:4}}>📅 {citasHoy.length} cita{citasHoy.length>1?"s":""} programada{citasHoy.length>1?"s":""} hoy</div>
-          )}
-          {seguimientosPendientes.length > 0 && (
-            <div style={{fontSize:12,color:"#9A3412"}}>✅ {seguimientosPendientes.length} seguimiento{seguimientosPendientes.length>1?"s":""} pendiente{seguimientosPendientes.length>1?"s":""}</div>
-          )}
+      {/* Seguimientos del día y semana */}
+      <div style={card}>
+        <div style={{fontSize:13, fontWeight:700, color:'#0F172A', marginBottom:12}}>📞 Mis Seguimientos</div>
+        <div style={{display:'flex', gap:10}}>
+          <div style={{flex:1, background:'#EFF6FF', borderRadius:10, padding:'14px', textAlign:'center', border:'1px solid #BFDBFE'}}>
+            <div style={{fontSize:28, fontWeight:800, color:'#1D4ED8'}}>{segHoy}</div>
+            <div style={{fontSize:11, color:'#3B82F6', marginTop:4, fontWeight:600}}>Hoy</div>
+            <div style={{fontSize:9, color:'#64748B', marginTop:2}}>Llamadas + WhatsApp</div>
+          </div>
+          <div style={{flex:1, background:'#F5F3FF', borderRadius:10, padding:'14px', textAlign:'center', border:'1px solid #DDD6FE'}}>
+            <div style={{fontSize:28, fontWeight:800, color:'#6D28D9'}}>{segSemana}</div>
+            <div style={{fontSize:11, color:'#7C3AED', marginTop:4, fontWeight:600}}>Esta Semana</div>
+            <div style={{fontSize:9, color:'#64748B', marginTop:2}}>Llamadas + WhatsApp</div>
+          </div>
         </div>
-      )}
+      </div>
 
-      {/* Mi embudo */}
-      <div style={{background:"white",borderRadius:14,padding:16,marginBottom:16,boxShadow:"0 1px 4px rgba(0,0,0,0.08)"}}>
-        <div style={{fontSize:13,fontWeight:700,color:"#0F172A",marginBottom:12}}>Mi Pipeline</div>
-        {ESTADOS.map(e=>{
-          const count = myProspectos.filter(p=>p.estado===e.key).length;
+      {/* Mi Pipeline */}
+      <div style={card}>
+        <div style={{fontSize:13, fontWeight:700, color:'#0F172A', marginBottom:12}}>Mi Pipeline</div>
+        {ESTADOS.map(e => {
+          const count = myProspectos.filter(p => p.estado === e.key).length;
           const total = myProspectos.length || 1;
           return(
-            <div key={e.key} style={{marginBottom:10}}>
-              <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
-                <span style={{fontSize:12,color:"#475569"}}>{e.label}</span>
-                <span style={{fontSize:12,fontWeight:700,color:"#0F172A"}}>{count}</span>
+            <div key={e.key} style={{marginBottom:9}}>
+              <div style={{display:'flex', justifyContent:'space-between', marginBottom:2}}>
+                <span style={{fontSize:11, color:'#475569'}}>{e.label}</span>
+                <span style={{fontSize:11, fontWeight:700, color:'#0F172A'}}>{count}</span>
               </div>
-              <div style={{height:7,background:"#F1F5F9",borderRadius:4,overflow:"hidden"}}>
-                <div style={{height:"100%",width:Math.round((count/total)*100)+"%",background:e.color,borderRadius:4}}/>
+              <div style={{height:7, background:'#F1F5F9', borderRadius:4, overflow:'hidden'}}>
+                <div style={{height:'100%', width:Math.round((count/total)*100)+'%', background:e.color, borderRadius:4}}/>
               </div>
             </div>
           );
         })}
-        <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid #F1F5F9",display:"flex",justifyContent:"space-between"}}>
-          <span style={{fontSize:12,color:"#64748B"}}>Total mis prospectos</span>
-          <span style={{fontSize:13,fontWeight:800,color:"#7C3AED"}}>{myProspectos.length}</span>
+        <div style={{marginTop:10, paddingTop:10, borderTop:'1px solid #F1F5F9', display:'flex', justifyContent:'space-between'}}>
+          <span style={{fontSize:11, color:'#64748B'}}>Total mis prospectos</span>
+          <span style={{fontSize:13, fontWeight:800, color:'#7C3AED'}}>{myProspectos.length}</span>
         </div>
-      </div>
-
-      {/* Citas próximas */}
-      <div style={{background:"white",borderRadius:14,padding:16,boxShadow:"0 1px 4px rgba(0,0,0,0.08)"}}>
-        <div style={{fontSize:13,fontWeight:700,color:"#0F172A",marginBottom:12}}>📅 Próximas Citas</div>
-        {myProspectos.filter(p=>p.estado==="CITA_AGENDADA"&&p.proximaAccion>=today)
-          .sort((a,b)=>a.proximaAccion.localeCompare(b.proximaAccion))
-          .slice(0,5)
-          .map(p=>(
-            <div key={p.id} style={{padding:"10px 0",borderBottom:"1px solid #F1F5F9"}}>
-              <div style={{fontSize:13,fontWeight:600,color:"#0F172A"}}>{p.nombre}</div>
-              <div style={{fontSize:11,color:"#64748B"}}>{p.proximaAccion}{p.horaCita?" · "+p.horaCita:""} · {p.zona}</div>
-            </div>
-          ))
-        }
-        {myProspectos.filter(p=>p.estado==="CITA_AGENDADA"&&p.proximaAccion>=today).length===0&&(
-          <div style={{fontSize:12,color:"#94A3B8",textAlign:"center",padding:"20px 0"}}>Sin citas próximas</div>
-        )}
       </div>
     </div>
   );
 }
 
-// ── LOGIN SCREEN ───────────────────────────────────────────────
+
 function LoginScreen({onLogin}){
   const [idVendedor,setIdVendedor]=useState("");
   const [pin,setPin]=useState("");
@@ -1530,6 +1567,7 @@ function AppMain({session,onLogout}){
           esCliente:    row[37]||"",
           seguimiento:  row[41]==="YES"||row[41]==="TRUE",
           tipoTrabajo:  row[39]||"",  // col AN
+          cuentaPrimerPedido: row[38]||"",  // col AM
           fechaPrimerPedido: row[26]||"",  // col AA
           fechaUltimoPedido: row[27]||"",  // col AB
           facturacion:  row[28]||"",  // col AC
